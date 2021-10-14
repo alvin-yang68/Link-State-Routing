@@ -1,0 +1,7 @@
+{
+    "files.associations": {
+        "stdexcept": "cpp",
+        "functional": "cpp",
+        "unordered_set": "cpp"
+    }
+}
