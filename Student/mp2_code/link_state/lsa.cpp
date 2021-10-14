@@ -8,7 +8,11 @@ LSA::LSA(int origin_id, int sequence_num) : origin_id{origin_id}, sequence_num{s
 
 void LSA::add_weight(int node_id, int weight)
 {
-    weights.push_back(make_pair(node_id, weight));
+    struct NeighborWeight pair = {
+        .id = node_id,
+        .weight = weight,
+    };
+    weights.push_back(pair);
 }
 
 unordered_set<int> LSA::get_neighbors()
@@ -16,9 +20,9 @@ unordered_set<int> LSA::get_neighbors()
     unordered_set<int> ids;
     ids.reserve(weights.size());
 
-    for (pair<int, int> &weight : weights)
+    for (struct NeighborWeight &pair : weights)
     {
-        ids.insert(weight.first);
+        ids.insert(pair.id);
     }
 
     return ids;

@@ -37,11 +37,11 @@ void Node::set_edge_weight(int target, int new_weight)
     edge_weights[target] = new_weight;
 }
 
-void Node::set_edge_weights(vector<pair<int, int>> new_weights)
+void Node::set_edge_weights(vector<struct NeighborWeight> new_neighbor_weights)
 {
-    for (pair<int, int> &p : new_weights)
+    for (struct NeighborWeight &p : new_neighbor_weights)
     {
-        set_edge_weight(p.first, p.second);
+        set_edge_weight(p.id, p.weight);
     }
 }
 
@@ -53,7 +53,7 @@ Graph::Graph(int self_id) : nodes{}, self_id{self_id}
 {
 }
 
-void Graph::accept(LSA &lsa)
+void Graph::accept_lsa(LSA &lsa)
 {
     if (!has_node(lsa.origin_id))
     {
