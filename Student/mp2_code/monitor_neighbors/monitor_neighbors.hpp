@@ -11,9 +11,13 @@
 #include <arpa/inet.h>
 #include <netdb.h>
 #include <pthread.h>
-#include <sys/time.h>
+#include <boost/archive/binary_iarchive.hpp>
+#include <boost/archive/binary_oarchive.hpp>
+#include <boost/iostreams/device/array.hpp>
+#include <boost/iostreams/stream.hpp>
 
 #include "link_state/graph.hpp"
+#include "utils.hpp"
 
 #define HEARTBEAT_INTERVAL_SEC 0
 #define HEARTBEAT_INTERVAL_NSEC 500 * 1000 * 1000 // 500ms
@@ -35,7 +39,8 @@ void hackyBroadcast(const char *buf, int length);
 void *announceToNeighbors(void *unusedParam);
 void listenForNeighbors();
 
-void *monitor_neighbors(void *arg);
+void *monitor_neighborhood_changes(void *arg);
 vector<int> get_expired_nodes();
-int subtract_timevals(struct timeval &a, struct timeval &b);
-void send_lsa(int destination_id, LSA lsa);
+void send_lsa(int destination_id, LSA &lsa);
+void serialize_lsa(LSA &lsa, char *buffer);
+LSA deserialize_lsa(char *buffer, int length);

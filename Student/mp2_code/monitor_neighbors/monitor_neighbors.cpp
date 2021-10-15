@@ -1,5 +1,8 @@
 #include "monitor_neighbors.hpp"
 
+using namespace boost::iostreams;
+using namespace boost::archive;
+
 // Yes, this is terrible. It's also terrible that, in Linux, a socket
 // can't receive broadcast packets unless it's bound to INADDR_ANY,
 // which we can't do in this assignment.
@@ -74,12 +77,15 @@ void listenForNeighbors()
         // TODO now check for the various types of packets you use in your own protocol
         // else if(!strncmp(recvBuf, "your other message types", ))
         //  ...
+        else if (!strncmp((char *)recvBuf, "lsa_", 4))
+        {
+        }
     }
     //(should never reach here)
     close(globalSocketUDP);
 }
 
-void *process_neighborhood_changes(void *arg)
+void *monitor_neighborhood_changes(void *arg)
 {
     Node *self_node = (Node *)arg;
 
@@ -91,15 +97,20 @@ void *process_neighborhood_changes(void *arg)
 
     while (1)
     {
-        unordered_set<int> updated_neighbors = get_online_nodes();
-        self_node->set_neighbors(updated_neighbors);
-        self_node->sequence_num += 1;
+        unordered_set<int> online_neighbors = get_online_nodes();
+        unordered_set<int> existing_neighbors = self_node->get_neighbors();
 
-        LSA lsa = self_node->generate_lsa();
-
-        for (const int &id : self_node->get_neighbors())
+        if (online_neighbors != existing_neighbors)
         {
-            send_lsa(id, lsa);
+            self_node->set_neighbors(online_neighbors);
+            self_node->sequence_num += 1;
+
+            LSA lsa = self_node->generate_lsa();
+
+            for (const int &id : online_neighbors)
+            {
+                send_lsa(id, lsa);
+            }
         }
 
         nanosleep(&sleep_duration, 0);
@@ -123,10 +134,33 @@ unordered_set<int> get_online_nodes()
     return online_nodes;
 }
 
-// Returns the difference between two timevals in milliseconds
-int subtract_timevals(struct timeval &a, struct timeval &b)
+void send_lsa(int destination_id, LSA &lsa)
 {
-    int diff_sec = a.tv_sec - b.tv_sec;
-    int diff_us = (int)a.tv_usec - (int)b.tv_usec;
-    return (diff_sec * 1000) + (diff_us / 1000);
+    size_t buffer_len = 5000;
+    char buffer[buffer_len];
+
+    serialize_lsa(lsa, buffer_len, buffer);
+
+    sendto(globalSocketUDP, buffer, buffer_len, 0,
+           (struct sockaddr *)&globalNodeAddrs[destination_id], sizeof(globalNodeAddrs[destination_id]));
+}
+
+void serialize_lsa(LSA &lsa, int length, char *buffer)
+{
+    basic_array_sink<char> sink(buffer, length);
+    stream<basic_array_sink<char>> source(sink);
+    binary_oarchive oa(source);
+
+    oa << lsa;
+}
+
+LSA deserialize_lsa(char *buffer, int length)
+{
+    stream<basic_array_source<char>> source(buffer);
+    binary_iarchive ia(source);
+
+    LSA lsa;
+    ia >> lsa;
+
+    return lsa;
 }
