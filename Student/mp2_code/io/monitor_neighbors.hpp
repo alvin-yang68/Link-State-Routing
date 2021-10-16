@@ -11,19 +11,8 @@
 #include <arpa/inet.h>
 #include <netdb.h>
 #include <pthread.h>
-#include <boost/archive/binary_iarchive.hpp>
-#include <boost/archive/binary_oarchive.hpp>
-#include <boost/iostreams/device/array.hpp>
-#include <boost/iostreams/stream.hpp>
 
-#include "link_state/graph.hpp"
-#include "utils.hpp"
-
-#define HEARTBEAT_INTERVAL_SEC 0
-#define HEARTBEAT_INTERVAL_NSEC 500 * 1000 * 1000 // 500ms
-#define CHECKUP_INTERVAL_SEC 1
-#define CHECKUP_INTERVAL_NSEC 500 * 1000 * 1000 // 500ms
-#define TIMEOUT_TOLERANCE_MS 1000
+#include "topology/graph.hpp"
 
 extern int globalMyID;
 // last time you heard from each node. TODO: you will want to monitor this
@@ -39,8 +28,9 @@ void hackyBroadcast(const char *buf, int length);
 void *announceToNeighbors(void *unusedParam);
 void listenForNeighbors();
 
+void receive_lsa(char *data);
 void *monitor_neighborhood_changes(void *arg);
 vector<int> get_expired_nodes();
-void send_lsa(int destination_id, LSA &lsa);
-void serialize_lsa(LSA &lsa, char *buffer);
-LSA deserialize_lsa(char *buffer, int length);
+void send_to_neighbor(int destination_id, LSA &lsa);
+string serialize(const LSA &obj);
+LSA deserialize(const string &data);
