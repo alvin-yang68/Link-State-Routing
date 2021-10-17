@@ -2,27 +2,27 @@
 #include <stdlib.h>
 #include <pthread.h>
 #include <sys/time.h>
-#include <iostream>
-#include <fstream>
-#include <sstream>
 
-#include "monitor_neighbors/monitor_neighbors.hpp"
-#include "link_state/graph.hpp"
-#include "link_state/lsa.hpp"
+#include "link_state/context.hpp"
+#include "io/network.hpp"
+#include "io/log.hpp"
 
-void listenForNeighbors();
-void *announceToNeighbors(void *unusedParam);
-void parse_initial_costs_file(char *filename, LSA *lsa);
+#define HEARTBEAT_INTERVAL_SEC 0
+#define HEARTBEAT_INTERVAL_NSEC 500 * 1000 * 1000 // 500ms
+#define CHECKUP_INTERVAL_SEC 1
+#define CHECKUP_INTERVAL_NSEC 500 * 1000 * 1000 // 500ms
+#define TIMEOUT_TOLERANCE_MS 1000
 
-int globalMyID = 0;
-//last time you heard from each node. TODO: you will want to monitor this
-//in order to realize when a neighbor has gotten cut off from you.
-struct timeval globalLastHeartbeat[256];
+void announce_to_neighbors(Communicator *communicator);
+void *announce_to_neighbors_t(void *arg);
+void monitor_neighborhood(LinkStateContext *context, Communicator *communicator);
+void *monitor_neighborhood_t(void *arg);
 
-//our all-purpose UDP socket, to be bound to 10.1.1.globalMyID, port 7777
-int globalSocketUDP;
-//pre-filled for sending to 10.1.1.0 - 255, port 7777
-struct sockaddr_in globalNodeAddrs[256];
+typedef struct
+{
+	LinkStateContext *context;
+	Communicator *communicator;
+} MonitorNeighborhoodParams;
 
 int main(int argc, char **argv)
 {
@@ -32,80 +32,82 @@ int main(int argc, char **argv)
 		exit(1);
 	}
 
-	//initialization: get this process's node ID, record what time it is,
-	//and set up our sockaddr_in's for sending to the other nodes.
-	globalMyID = atoi(argv[1]);
-	int i;
-	for (i = 0; i < 256; i++)
-	{
-		gettimeofday(&globalLastHeartbeat[i], 0);
+	int self_id = atoi(argv[1]);
+	char *cost_file_name = argv[2];
+	char *log_file_name = argv[3];
 
-		char tempaddr[100];
-		sprintf(tempaddr, "10.1.1.%d", i);
-		memset(&globalNodeAddrs[i], 0, sizeof(globalNodeAddrs[i]));
-		globalNodeAddrs[i].sin_family = AF_INET;
-		globalNodeAddrs[i].sin_port = htons(7777);
-		inet_pton(AF_INET, tempaddr, &globalNodeAddrs[i].sin_addr);
-	}
+	LinkStateContext context = LinkStateContext(self_id, cost_file_name);
+	Log output_log = Log(log_file_name);
+	Communicator communicator = Communicator(&context, &output_log);
 
-	//TODO: read and parse initial costs file. default to cost 1 if no entry for a node. file may be empty.
-	LSA self_lsa = LSA(globalMyID, 0);
-	parse_initial_costs_file(argv[2], self_lsa);
+	struct timespec heartbeat_interval;
+	heartbeat_interval.tv_sec = HEARTBEAT_INTERVAL_SEC;
+	heartbeat_interval.tv_nsec = HEARTBEAT_INTERVAL_NSEC;
 
-	Graph graph = Graph(globalMyID);
-	graph.accept(self_lsa);
+	struct timespec checkup_interval;
+	checkup_interval.tv_sec = CHECKUP_INTERVAL_SEC;
+	checkup_interval.tv_nsec = CHECKUP_INTERVAL_NSEC;
 
-	Node *self_node = graph.get_self_node();
-
-	//socket() and bind() our socket. We will do all sendto()ing and recvfrom()ing on this one.
-	if ((globalSocketUDP = socket(AF_INET, SOCK_DGRAM, 0)) < 0)
-	{
-		perror("socket");
-		exit(1);
-	}
-	char myAddr[100];
-	struct sockaddr_in bindAddr;
-	sprintf(myAddr, "10.1.1.%d", globalMyID);
-	memset(&bindAddr, 0, sizeof(bindAddr));
-	bindAddr.sin_family = AF_INET;
-	bindAddr.sin_port = htons(7777);
-	inet_pton(AF_INET, myAddr, &bindAddr.sin_addr);
-	if (bind(globalSocketUDP, (struct sockaddr *)&bindAddr, sizeof(struct sockaddr_in)) < 0)
-	{
-		perror("bind");
-		close(globalSocketUDP);
-		exit(1);
-	}
-
-	//start threads... feel free to add your own, and to remove the provided ones.
-	pthread_t announcerThread;
-	pthread_create(&announcerThread, NULL, announceToNeighbors, (void *)0);
-
-	pthread_t monitor_thread;
-	pthread_create(&monitor_thread, NULL, monitor_neighbors, (void *)&self_node);
-
-	//good luck, have fun!
-	listenForNeighbors();
+	communicator.monitor_neighborhood(heartbeat_interval, checkup_interval);
 }
 
-void parse_initial_costs_file(char *filename, LSA &lsa)
+void announce_to_neighbors(Communicator *communicator)
 {
-	ifstream input_file_stream(filename);
-	string line;
+	pthread_t announcer_thread;
+	pthread_create(&announcer_thread, NULL, announce_to_neighbors_t, (void *)communicator);
+}
 
-	while (getline(input_file_stream, line))
+void *announce_to_neighbors_t(void *arg)
+{
+	Communicator *communicator = (Communicator *)arg;
+
+	struct timespec sleepFor;
+	sleepFor.tv_sec = HEARTBEAT_INTERVAL_SEC;
+	sleepFor.tv_nsec = HEARTBEAT_INTERVAL_NSEC;
+	while (1)
 	{
-		vector<int> pair;
-		pair.reserve(2);
+		communicator->broadcast_heartbeats();
+		nanosleep(&sleepFor, 0);
+	}
+}
 
-		stringstream line_stream(line);
-		string substr;
+void monitor_neighborhood(LinkStateContext *context, Communicator *communicator)
+{
+	MonitorNeighborhoodParams params;
+	params.communicator = communicator;
+	params.context = context;
 
-		while (getline(line_stream, substr, ' '))
+	pthread_t monitor_thread;
+	pthread_create(&monitor_thread, NULL, monitor_neighborhood_t, (void *)&params);
+}
+
+void *monitor_neighborhood_t(void *arg)
+{
+	MonitorNeighborhoodParams *params = (MonitorNeighborhoodParams *)arg;
+	HeartbeatsTracker *hb_tracker = params->context->get_hb_tracker();
+	Node *self_node = params->context->get_self_node();
+	Communicator *communicator = params->communicator;
+
+	struct timespec sleep_duration;
+	sleep_duration.tv_sec = CHECKUP_INTERVAL_SEC;
+	sleep_duration.tv_nsec = CHECKUP_INTERVAL_NSEC;
+
+	while (1)
+	{
+		nanosleep(&sleep_duration, 0); // We sleep first because `globalLastHeartbeat` was initialized to the time when the program was started
+
+		unordered_set<int> online_neighbors = hb_tracker->get_online_nodes(TIMEOUT_TOLERANCE_MS);
+		if (online_neighbors != self_node->neighbors)
 		{
-			pair.push_back(stoi(substr));
-		}
+			self_node->neighbors = online_neighbors;
+			self_node->sequence_num += 1;
 
-		lsa.add_weight(pair[0], pair[1]);
+			LSA lsa = self_node->to_lsa();
+
+			for (const int &id : online_neighbors)
+			{
+				communicator->send_lsa(id, lsa);
+			}
+		}
 	}
 }
