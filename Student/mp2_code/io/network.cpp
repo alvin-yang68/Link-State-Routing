@@ -87,24 +87,21 @@ void Socket::close_socket()
     close(socket_fd);
 }
 
-const char *LsaSerializer::serialize(const LSA &obj)
+void LsaSerializer::serialize(const LSA &input, char *output, size_t output_len)
 {
     stringstream ss;
     binary_oarchive oa(ss);
 
-    oa << obj;
+    oa << input;
 
     string data = ss.str();
-    return data.c_str();
+    memcpy(output, data.c_str(), output_len);
 }
 
-LSA LsaSerializer::deserialize(const char *data)
+void LsaSerializer::deserialize(const char *input, LSA *output)
 {
-    stringstream ss(data);
+    stringstream ss(input);
     binary_iarchive ia(ss);
 
-    LSA obj;
-    ia >> obj;
-
-    return obj;
+    ia >> *output;
 }

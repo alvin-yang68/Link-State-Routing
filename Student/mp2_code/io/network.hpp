@@ -41,6 +41,6 @@ private:
 class LsaSerializer
 {
 public:
-    const char *serialize(const LSA &obj);
-    LSA deserialize(const char *data);
+    void serialize(const LSA &input, char *output, size_t output_len);
+    void deserialize(const char *input, LSA *output);
 };
