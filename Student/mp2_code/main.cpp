@@ -25,8 +25,6 @@ int main(int argc, char **argv)
 
 	LinkState ls = LinkState(self_id, cost_file_name, log_file_name);
 
-	ls.send_lsa_to_neighbors();
-
 	struct timespec heartbeat_interval;
 	heartbeat_interval.tv_sec = HEARTBEAT_INTERVAL_SEC;
 	heartbeat_interval.tv_nsec = HEARTBEAT_INTERVAL_NSEC;

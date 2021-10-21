@@ -28,35 +28,51 @@ void LinkState::set_initial_costs(const char *filename)
             pair[i] = stoi(substr);
         }
 
+        self_node->insert_neighbor(pair[0]);
         self_node->set_edge_weight(pair[0], pair[1]);
-    }
-}
-
-void LinkState::send_lsa_to_neighbors()
-{
-    Node *self_node = graph.get_node(self_id);
-    LSA lsa = self_node->generate_lsa();
-    const char *serialized_lsa = lsa_serializer.serialize(lsa);
-
-    size_t buffer_len;
-    char buffer[5000];
-    buffer_len = sprintf(buffer, "lsa%s", serialized_lsa);
-
-    for (const int &id : self_node->neighbors)
-    {
-        socket.send(id, buffer, buffer_len);
     }
 }
 
 void LinkState::monitor_neighborhood(struct timespec heartbeat_interval, struct timespec checkup_interval, int timeout_tolerance)
 {
+    thread listen_for_neighbors_thread(&LinkState::listen_for_neighbors, this);
     thread broadcast_heartbeats_thread(&LinkState::broadcast_heartbeats, this, heartbeat_interval);
     thread update_neighbors_thread(&LinkState::monitor_heartbeats, this, checkup_interval, timeout_tolerance);
 
-    listen_for_neighbors();
+    send_initial_lsa();
 
+    listen_for_neighbors_thread.join();
     broadcast_heartbeats_thread.join();
     update_neighbors_thread.join();
+}
+
+void LinkState::send_initial_lsa()
+{
+    struct timespec sleep_interval;
+    sleep_interval.tv_sec = 0;
+    sleep_interval.tv_nsec = 1000;
+
+    nanosleep(&sleep_interval, 0);
+    send_lsa_to_neighbors();
+}
+
+void LinkState::send_lsa_to_neighbors()
+{
+    char serialized_lsa[4997];
+
+    Node *self_node = graph.get_node(self_id);
+    LSA lsa = self_node->generate_lsa();
+    lsa_serializer.serialize(lsa, serialized_lsa, 4997);
+
+    size_t buffer_len;
+    char buffer[5000];
+    buffer_len = sprintf(buffer, "lsa");
+    memcpy(buffer + 3, serialized_lsa, 4997);
+
+    for (const int &id : self_node->neighbors)
+    {
+        socket.send(id, buffer, buffer_len);
+    }
 }
 
 void LinkState::broadcast_heartbeats(struct timespec heartbeat_interval)
@@ -146,7 +162,8 @@ bool LinkState::has_prefix(const char *recv_buffer, const char *prefix)
 
 void LinkState::handle_lsa_command(const char *recv_buffer, int from_id)
 {
-    LSA lsa = lsa_serializer.deserialize(recv_buffer + 3);
+    LSA lsa;
+    lsa_serializer.deserialize(recv_buffer + 3, &lsa);
 
     if (!graph.accept_lsa(lsa)) // If stale LSA, then do nothing
         return;

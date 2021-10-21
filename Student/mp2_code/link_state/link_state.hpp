@@ -16,7 +16,6 @@ class LinkState
 {
 public:
     LinkState(int self_id, const char *cost_file_name, const char *log_file_name);
-    void send_lsa_to_neighbors();
     void monitor_neighborhood(struct timespec heartbeat_interval, struct timespec checkup_interval, int timeout_tolerance);
 
 private:
@@ -28,6 +27,8 @@ private:
     Graph graph;
     RouteFinder route_finder;
     void set_initial_costs(const char *filename);
+    void send_initial_lsa();
+    void send_lsa_to_neighbors();
     void broadcast_heartbeats(struct timespec heartbeat_interval);
     void monitor_heartbeats(struct timespec checkup_interval, int timeout_tolerance);
     void listen_for_neighbors();
