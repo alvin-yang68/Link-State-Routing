@@ -4,9 +4,12 @@
 #include <unordered_set>
 #include <unordered_map>
 #include <vector>
+#include <queue>
 
-#include "types.hpp"
-#include "lsa.hpp"
+#include "link_state/types.hpp"
+#include "link_state/lsa.hpp"
+
+#define NUM_OF_NODES 256
 
 using namespace std;
 
@@ -15,34 +18,52 @@ class Node
 public:
     const int id;
     int sequence_num;
+    unordered_set<int> neighbors;
     Node(const Node &obj);
     Node(int id);
-    unordered_set<int> get_neighbors();
-    void set_neighbors(const unordered_set<int> &new_neighbors);
+    bool has_neighbor(int target);
     int get_edge_weight(int target);
     void set_edge_weight(int target, int new_weight);
-    LSA to_lsa();
-    bool from_lsa(LSA &lsa);
+    LSA generate_lsa();
 
 private:
-    unordered_set<int> neighbors;
     unordered_map<int, int> edge_weights;
-    bool has_neighbor(int target);
-    void set_edge_weights(vector<struct NeighborWeight> new_weights);
+    void set_edge_weights(vector<struct EdgeToNeighbor> new_weights);
 };
 
 /** Maintains the network topology, including information about the shortest paths **/
 class Graph
 {
 public:
-    Graph(int self_id);
-    Node *get_self_node();
+    Node *get_node(int id);
+    void register_node(Node *node);
+    void set_edge_weight_pairs(int source_id, int target_id, int new_weight);
     bool accept_lsa(LSA &lsa);
-    int find_next_hop(int destination_id);
 
 private:
-    Node *self_node;
     unordered_map<int, Node *> nodes;
     bool has_node(int target);
-    void run_dijkstra();
 };
+
+class RouteFinder
+{
+public:
+    RouteFinder(int self_id);
+    void register_graph(Graph *graph);
+    int find_next_hop(int destination_id);
+    void run_dijkstra();
+
+private:
+    const int self_id;
+    Graph *graph;
+    vector<int> distances;
+    vector<int> predecessors;
+    priority_queue<EdgeToNeighbor, vector<EdgeToNeighbor>, CompareWeight> frontier;
+    void reset_states();
+};
+
+template <class Q>
+void clear_queue(Q &q)
+{
+    q = Q();
+}

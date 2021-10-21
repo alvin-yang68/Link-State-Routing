@@ -2,6 +2,9 @@
 
 #include "graph.hpp"
 
+#define INFINITY 0x3f3f3f3f
+#define UNKNOWN -1
+
 using namespace std;
 
 Node::Node(int id) : id{id}, sequence_num{0}, neighbors{}, edge_weights{}
@@ -16,16 +19,6 @@ Node::Node(const Node &obj) : id{obj.id}, sequence_num{obj.sequence_num}, neighb
 bool Node::has_neighbor(int target)
 {
     return neighbors.find(target) == neighbors.end();
-}
-
-unordered_set<int> Node::get_neighbors()
-{
-    return neighbors;
-}
-
-void Node::set_neighbors(const unordered_set<int> &new_neighbors)
-{
-    neighbors = new_neighbors;
 }
 
 int Node::get_edge_weight(int target)
@@ -55,15 +48,15 @@ void Node::set_edge_weight(int target, int new_weight)
     }
 }
 
-void Node::set_edge_weights(vector<struct NeighborWeight> new_neighbor_weights)
+void Node::set_edge_weights(vector<struct EdgeToNeighbor> new_edges)
 {
-    for (struct NeighborWeight &p : new_neighbor_weights)
+    for (struct EdgeToNeighbor &edge : new_edges)
     {
-        set_edge_weight(p.id, p.weight);
+        set_edge_weight(edge.neighbor_id, edge.weight);
     }
 }
 
-LSA Node::to_lsa()
+LSA Node::generate_lsa()
 {
     LSA lsa = LSA(id, sequence_num);
 
@@ -75,50 +68,114 @@ LSA Node::to_lsa()
     return lsa;
 }
 
-bool Node::from_lsa(LSA &lsa)
+Node *Graph::get_node(int id)
 {
-    if (lsa.sequence_num <= sequence_num)
-        return false;
-
-    sequence_num = lsa.sequence_num;
-    set_neighbors(lsa.get_neighbors());
-    set_edge_weights(lsa.weights);
-
-    return true;
+    return nodes.at(id);
 }
 
-Graph::Graph(int self_id) : self_node{new Node(self_id)}, nodes{}
+void Graph::register_node(Node *node)
 {
-    nodes[self_node->id] = self_node;
+    nodes.insert(make_pair(node->id, node));
 }
 
-Node *Graph::get_self_node()
+void Graph::set_edge_weight_pairs(int source_id, int target_id, int new_weight)
 {
-    return self_node;
+    Node *source_node = nodes.at(source_id);
+    source_node->set_edge_weight(target_id, new_weight);
+
+    Node *target_node = nodes.at(target_id);
+    target_node->set_edge_weight(source_id, new_weight);
 }
 
 bool Graph::accept_lsa(LSA &lsa)
 {
-    bool is_fresh_lsa;
+    int target_id = lsa.origin_id;
 
-    if (!has_node(lsa.origin_id))
+    if (!has_node(target_id))
     {
-        int id = lsa.origin_id;
-        Node *new_node = new Node(id);
-        is_fresh_lsa = new_node->from_lsa(lsa);
-        nodes.insert(make_pair(id, new_node));
+        Node *new_node = new Node(target_id);
+        nodes.insert(make_pair(target_id, new_node));
     }
 
-    Node *target = nodes[lsa.origin_id];
-    is_fresh_lsa = target->from_lsa(lsa);
+    Node *target_node = nodes[target_id];
 
-    if (is_fresh_lsa)
-        run_dijkstra();
+    if (lsa.sequence_num <= target_node->sequence_num)
+        return false;
 
-    return is_fresh_lsa;
+    target_node->sequence_num = lsa.sequence_num;
+    target_node->neighbors = lsa.get_neighbors();
+
+    for (const struct EdgeToNeighbor &new_edge : lsa.edges)
+    {
+        set_edge_weight_pairs(target_id, new_edge.neighbor_id, new_edge.weight);
+    }
+
+    return true;
 }
 
 bool Graph::has_node(int target)
 {
     return nodes.find(target) == nodes.end();
+}
+
+RouteFinder::RouteFinder(int self_id) : self_id{self_id}
+{
+}
+
+void RouteFinder::register_graph(Graph *graph)
+{
+    this->graph = graph;
+}
+
+void RouteFinder::run_dijkstra()
+{
+    reset_states();
+    frontier.push({.neighbor_id = self_id, .weight = distances[self_id]});
+
+    while (!frontier.empty())
+    {
+        const int curr_id = frontier.top().neighbor_id;
+        frontier.pop();
+
+        Node *curr_node = graph->get_node(curr_id);
+
+        for (const int neighbor_id : curr_node->neighbors)
+        {
+            const bool is_unvisited = distances[neighbor_id] == INFINITY ? true : false;
+
+            const int potential_weight = distances[curr_id] + curr_node->get_edge_weight(neighbor_id);
+
+            if (potential_weight < distances[neighbor_id])
+            {
+                distances[neighbor_id] = potential_weight;
+                predecessors[neighbor_id] = curr_id;
+            }
+
+            if (is_unvisited)
+                frontier.push({.neighbor_id = neighbor_id, .weight = distances[neighbor_id]});
+        }
+    }
+}
+
+void RouteFinder::reset_states()
+{
+    distances = vector<int>(NUM_OF_NODES, INFINITY);
+    distances[self_id] = 0;
+
+    predecessors = vector<int>(NUM_OF_NODES, UNKNOWN);
+    predecessors[self_id] = self_id;
+
+    clear_queue(frontier);
+}
+
+int RouteFinder::find_next_hop(int destination_id)
+{
+    int curr_id = destination_id;
+
+    while (predecessors[curr_id] != self_id && curr_id != -1)
+    {
+        curr_id = predecessors[curr_id];
+    }
+
+    return curr_id;
 }
