@@ -2,7 +2,7 @@
 
 using namespace std;
 
-Log::Log(char *filename) : file_handler{fopen(filename, "wb")}
+Log::Log(const char *filename) : file_handler{fopen(filename, "wb")}
 {
 }
 
