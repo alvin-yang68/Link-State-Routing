@@ -2,27 +2,27 @@
 
 using namespace std;
 
-LSA::LSA(int origin_id, int sequence_num) : origin_id{origin_id}, sequence_num{sequence_num}, weights{}
+LSA::LSA(int origin_id, int sequence_num) : origin_id{origin_id}, sequence_num{sequence_num}, edges{}
 {
 }
 
 void LSA::add_weight(int node_id, int weight)
 {
-    struct NeighborWeight pair = {
-        .id = node_id,
-        .weight = weight,
-    };
-    weights.push_back(pair);
+    struct EdgeToNeighbor edge;
+    edge.neighbor_id = node_id;
+    edge.weight = weight;
+
+    edges.push_back(edge);
 }
 
-unordered_set<int> LSA::get_neighbors()
+unordered_set<int> LSA::get_neighbors() const
 {
     unordered_set<int> ids;
-    ids.reserve(weights.size());
+    ids.reserve(edges.size());
 
-    for (struct NeighborWeight &pair : weights)
+    for (const struct EdgeToNeighbor &edge : edges)
     {
-        ids.insert(pair.id);
+        ids.insert(edge.neighbor_id);
     }
 
     return ids;
