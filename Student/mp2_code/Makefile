@@ -1,15 +1,12 @@
 CC=g++
-CC_OPTS="-g -I."
-CC_LIBS="-pthread"
-CC_DEFINES=
-CC_INCLUDES=
-CC_ARGS=${CC_OPTS} ${CC_LIBS} ${CC_DEFINES} ${CC_INCLUDES}
+CC_OPTS=-g -I.
+CC_LIBS=-pthread -lboost_serialization -lboost_system
 
-ls: main.cpp monitor_neighbors.hpp
-	@${CC} ${CC_ARGS} -o ls_router main.cpp monitor_neighbors/*.cpp link_state/*.cpp
+ls: main.cpp link_state/*.cpp io/*.cpp
+	@${CC} ${CC_OPTS} -o ls_router main.cpp link_state/*.cpp io/*.cpp ${CC_LIBS}
 
 # clean is not a file
 .PHONY: clean
 
 clean:
-	rm *.o ls_router
+	rm -f *.o ls_router
