@@ -23,9 +23,6 @@ bool Node::has_neighbor(int target)
 
 int Node::get_edge_weight(int target)
 {
-    if (!has_neighbor(target))
-        throw out_of_range("non-existent edge");
-
     try
     {
         return edge_weights.at(target);
@@ -38,14 +35,7 @@ int Node::get_edge_weight(int target)
 
 void Node::set_edge_weight(int target, int new_weight)
 {
-    try
-    {
-        edge_weights.at(target) = new_weight;
-    }
-    catch (const out_of_range &e)
-    {
-        cerr << "set_edge_weight: " << target << " not a neighbor of " << id << endl;
-    }
+    edge_weights[target] = new_weight;
 }
 
 void Node::set_edge_weights(vector<struct EdgeToNeighbor> new_edges)
