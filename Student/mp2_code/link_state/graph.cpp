@@ -16,6 +16,11 @@ Node::Node(const Node &obj) : id{obj.id}, sequence_num{obj.sequence_num}, neighb
 {
 }
 
+void Node::insert_neighbor(int target)
+{
+    neighbors.insert(target);
+}
+
 bool Node::has_neighbor(int target)
 {
     return neighbors.find(target) == neighbors.end();
