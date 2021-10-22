@@ -58,16 +58,15 @@ void LinkState::send_initial_lsa()
 
 void LinkState::send_lsa_to_neighbors()
 {
-    char serialized_lsa[4997];
-
     Node *self_node = graph.get_node(self_id);
     LSA lsa = self_node->generate_lsa();
+
+    char serialized_lsa[4997];
     lsa_serializer.serialize(lsa, serialized_lsa, 4997);
 
     size_t buffer_len;
     char buffer[5000];
-    buffer_len = sprintf(buffer, "lsa");
-    memcpy(buffer + 3, serialized_lsa, 4997);
+    buffer_len = sprintf(buffer, "lsa", serialized_lsa);
 
     for (const int &id : self_node->neighbors)
     {
@@ -116,10 +115,11 @@ void LinkState::listen_for_neighbors()
     struct sockaddr_in neighbor_sockaddr;
     char neighbor_addr[100];
     char recv_buffer[5000];
+    size_t recv_buffer_len;
 
     while (1)
     {
-        socket.receive(recv_buffer, 5000, neighbor_sockaddr); // This will block
+        recv_buffer_len = socket.receive(recv_buffer, 5000, neighbor_sockaddr); // This will block
 
         // Extract the IP address of the sender and assign it to `neighbor_addr`
         inet_ntop(AF_INET, &neighbor_sockaddr.sin_addr, neighbor_addr, 100);
@@ -131,7 +131,7 @@ void LinkState::listen_for_neighbors()
             hb_tracker.register_heartbeat(neighbor_id);
 
         else if (has_prefix(recv_buffer, "lsa"))
-            handle_lsa_command(recv_buffer, neighbor_id);
+            handle_lsa_command(recv_buffer, recv_buffer_len, neighbor_id);
 
         // We handle both the send and forward commands similarly
         else if (has_prefix(recv_buffer, "send") || has_prefix(recv_buffer, "frwd"))
@@ -160,10 +160,10 @@ bool LinkState::has_prefix(const char *recv_buffer, const char *prefix)
     return !strncmp(recv_buffer, prefix, strlen(prefix));
 }
 
-void LinkState::handle_lsa_command(const char *recv_buffer, int from_id)
+void LinkState::handle_lsa_command(const char *recv_buffer, size_t recv_buffer_len, int from_id)
 {
     LSA lsa;
-    lsa_serializer.deserialize(recv_buffer + 3, &lsa);
+    lsa_serializer.deserialize(recv_buffer + 3, recv_buffer_len, &lsa);
 
     if (!graph.accept_lsa(lsa)) // If stale LSA, then do nothing
         return;
@@ -213,6 +213,7 @@ int LinkState::extract_int(const char *network_buffer, size_t size)
     char number[size + 1];
     strncpy(number, network_buffer, size + 1); // `size + 1` to ensure the last char is a NULL
 
+    // TODO: Divide this method into short and long versions
     if (size <= 2)
         return ntohs(atoi(number)); // short int
     else

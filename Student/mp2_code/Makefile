@@ -1,6 +1,6 @@
 CC=g++
 CC_OPTS=-g -I.
-CC_LIBS=-pthread -lboost_serialization -lboost_system
+CC_LIBS=-pthread
 
 all: ls manager
 

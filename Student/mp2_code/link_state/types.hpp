@@ -9,15 +9,6 @@ struct EdgeToNeighbor
 public:
     int neighbor_id;
     int weight;
-
-private:
-    friend class boost::serialization::access;
-    template <class Archive>
-    void serialize(Archive &ar, const unsigned int version)
-    {
-        ar &neighbor_id;
-        ar &weight;
-    }
 };
 
 struct CompareWeight

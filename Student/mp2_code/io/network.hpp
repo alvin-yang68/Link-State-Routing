@@ -12,13 +12,8 @@
 #include <netinet/in.h>
 #include <arpa/inet.h>
 #include <netdb.h>
-#include <boost/archive/binary_iarchive.hpp>
-#include <boost/archive/binary_oarchive.hpp>
-#include <sstream>
 
 #include "link_state/lsa.hpp"
-
-using namespace boost::archive;
 
 /* Handles socket IO to other nodes */
 class Socket
@@ -41,6 +36,12 @@ private:
 class LsaSerializer
 {
 public:
-    void serialize(const LSA &input, char *output, size_t output_len);
-    void deserialize(const char *input, LSA *output);
+    int serialize(const LSA &lsa, char *buffer, size_t buffer_len);
+    void deserialize(const char *buffer, size_t buffer_len, LSA *lsa);
+
+private:
+    int concat_short(short int num, char *buffer);
+    int concat_long(long int num, char *buffer);
+    short int extract_short(const char *buffer);
+    long int extract_long(const char *buffer);
 };
