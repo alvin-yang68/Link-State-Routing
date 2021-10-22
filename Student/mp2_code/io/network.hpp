@@ -14,6 +14,7 @@
 #include <netdb.h>
 
 #include "link_state/lsa.hpp"
+#include "utils.hpp"
 
 /* Handles socket IO to other nodes */
 class Socket
@@ -38,10 +39,4 @@ class LsaSerializer
 public:
     int serialize(const LSA &lsa, char *buffer, size_t buffer_len);
     void deserialize(const char *buffer, size_t buffer_len, LSA *lsa);
-
-private:
-    int concat_short(short int num, char *buffer);
-    int concat_long(long int num, char *buffer);
-    short int extract_short(const char *buffer);
-    long int extract_long(const char *buffer);
 };

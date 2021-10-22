@@ -87,31 +87,17 @@ int LsaSerializer::serialize(const LSA &lsa, char *buffer, size_t buffer_len)
 {
     int current_len = 0;
 
-    current_len += concat_short(lsa.origin_id, buffer + current_len);
-    current_len += concat_long(lsa.sequence_num, buffer + current_len);
+    current_len += add_short(lsa.origin_id, buffer + current_len);
+    current_len += add_long(lsa.sequence_num, buffer + current_len);
 
     for (const EdgeToNeighbor &edge : lsa.edges)
     {
-        current_len += concat_short(edge.neighbor_id, buffer + current_len);
-        current_len += concat_long(edge.weight, buffer + current_len);
+        current_len += add_short(edge.neighbor_id, buffer + current_len);
+        current_len += add_long(edge.weight, buffer + current_len);
     }
 
     buffer[current_len] = '\0';
     return current_len;
-}
-
-int LsaSerializer::concat_short(short int num, char *buffer)
-{
-    short int network_num = htons(num);
-    memcpy(buffer, &network_num, sizeof(short int));
-    return sizeof(short int);
-}
-
-int LsaSerializer::concat_long(long int num, char *buffer)
-{
-    long int network_num = htonl(num);
-    memcpy(buffer, &network_num, sizeof(long int));
-    return sizeof(long int);
 }
 
 void LsaSerializer::deserialize(const char *buffer, size_t buffer_len, LSA *lsa)
@@ -136,22 +122,4 @@ void LsaSerializer::deserialize(const char *buffer, size_t buffer_len, LSA *lsa)
     }
 
     assert(idx == buffer_len);
-}
-
-short int LsaSerializer::extract_short(const char *buffer)
-{
-    char num_str[sizeof(short int) + 1];
-    memcpy(num_str, buffer, sizeof(short int));
-    num_str[sizeof(short int)] = '\0';
-
-    return ntohs(atoi(num_str));
-}
-
-long int LsaSerializer::extract_long(const char *buffer)
-{
-    char num_str[sizeof(long int) + 1];
-    memcpy(num_str, buffer, sizeof(long int));
-    num_str[sizeof(long int)] = '\0';
-
-    return ntohl(atoi(num_str));
 }
