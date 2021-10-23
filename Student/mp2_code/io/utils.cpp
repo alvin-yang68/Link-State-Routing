@@ -16,18 +16,14 @@ int add_long(long int num, char *buffer)
 
 short int extract_short(const char *buffer)
 {
-    char num_str[sizeof(short int) + 1];
-    memcpy(num_str, buffer, sizeof(short int));
-    num_str[sizeof(short int)] = '\0';
-
-    return ntohs(atoi(num_str));
+    short int network_num;
+    memcpy(&network_num, buffer, sizeof(short int));
+    return ntohs(network_num);
 }
 
 long int extract_long(const char *buffer)
 {
-    char num_str[sizeof(long int) + 1];
-    memcpy(num_str, buffer, sizeof(long int));
-    num_str[sizeof(long int)] = '\0';
-
-    return ntohl(atoi(num_str));
+    long int network_num;
+    memcpy(&network_num, buffer, sizeof(long int));
+    return ntohl(network_num);
 }
