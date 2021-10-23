@@ -49,12 +49,12 @@ void Socket::init_socket()
     }
 }
 
-size_t Socket::receive(char *buffer, struct sockaddr_in *neighbor_sockaddr)
+size_t Socket::receive(char *buffer, size_t buffer_len, struct sockaddr_in *neighbor_sockaddr)
 {
     size_t bytes_received;
     socklen_t neighbor_sockaddr_len = sizeof(*neighbor_sockaddr);
 
-    if ((bytes_received = recvfrom(socket_fd, buffer, sizeof(buffer), 0,
+    if ((bytes_received = recvfrom(socket_fd, buffer, buffer_len, 0,
                                    (struct sockaddr *)neighbor_sockaddr, &neighbor_sockaddr_len)) == -1)
     {
         perror("Socket: recvfrom");
@@ -110,7 +110,7 @@ void LsaSerializer::deserialize(const char *buffer, size_t buffer_len, LSA *lsa)
     lsa->sequence_num = extract_long(buffer + idx);
     idx += sizeof(long int);
 
-    while (idx <= buffer_len)
+    while (idx < buffer_len)
     {
         int neighbor_id = extract_short(buffer + idx);
         idx += sizeof(short int);
