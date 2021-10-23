@@ -161,8 +161,10 @@ void LinkState::handle_lsa_command(const char *recv_buffer, size_t message_len, 
     {
         // Forward LSA to our neighbors, but don't send the LSA back to the neighbor who sent it to us
         if (id != from_id)
-            socket.send(id, recv_buffer, strlen(recv_buffer));
+            socket.send(id, recv_buffer, message_len);
     }
+
+    route_finder.run_dijkstra();
 }
 
 void LinkState::handle_send_or_forward_command(const char *recv_buffer, bool is_from_manager)

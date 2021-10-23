@@ -10,8 +10,8 @@
 #include "graph.hpp"
 #include "heartbeats.hpp"
 
-#define LSA_FREQUENCY 2
-#define DIJKSTRA_FREQUENCY 2
+#define LSA_FREQUENCY 1
+#define DIJKSTRA_FREQUENCY 1
 
 class LinkState
 {
