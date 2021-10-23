@@ -1,18 +1,33 @@
 #!/bin/bash
-make clean
-make all
 
-# Rest iptables config
-sudo iptables -F
+# nodes=(0 1 2 3 4 5 6 7 255) # all node ids
+nodes=(1)
 
-perl make_topology.pl testtopo.txt
+init () {
+    # reset iptables config
+    sudo iptables -F
 
-./ls_router 0 testinitcosts0 log0
-./ls_router 1 testinitcosts1 log1
-./ls_router 2 testinitcosts2 log2
-./ls_router 3 testinitcosts3 log3
-./ls_router 4 testinitcosts4 log4
-./ls_router 5 testinitcosts5 log5
-./ls_router 6 testinitcosts6 log6
-./ls_router 7 testinitcosts7 log7
-./ls_router 255 testinitcosts255 log255
+    perl make_topology.pl testtopo.txt
+}
+
+# loop through each node id, call `ls_router` and make it a background process
+start () {
+    rm -f ./log*   # clean up old log files
+
+    local pids=() # all process ids
+
+    for id in ${nodes[@]}; do
+        ./ls_router $id "testinitcosts${id}" "log${id}" &   # run `ls_router` in background
+        pids+=($!)    # save the pid of most recently executed background process
+    done
+
+    echo "pids: ${pids[@]}"
+}
+
+if [[ $1 == "init" ]]; then
+    init
+fi
+
+if [[ $1 == "start" ]]; then
+    start
+fi
