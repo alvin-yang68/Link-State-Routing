@@ -7,7 +7,7 @@
 
 using namespace std;
 
-Node::Node(int id) : id{id}, sequence_num{0}, neighbors{}, edge_weights{}
+Node::Node(int id) : id{id}, sequence_num{-1}, neighbors{}, edge_weights{}
 {
     edge_weights.insert(make_pair(id, 0)); // Edge weight to itself is zero
 }
@@ -65,20 +65,28 @@ LSA Node::generate_lsa()
 
 Node *Graph::get_node(int id)
 {
-    return nodes.at(id);
+    try
+    {
+        return nodes.at(id);
+    }
+    catch (const out_of_range &e)
+    {
+        return register_node(new Node(id));
+    }
 }
 
-void Graph::register_node(Node *node)
+Node *Graph::register_node(Node *node)
 {
     nodes.insert(make_pair(node->id, node));
+    return node;
 }
 
 void Graph::set_edge_weight_pairs(int source_id, int target_id, int new_weight)
 {
-    Node *source_node = nodes.at(source_id);
+    Node *source_node = get_node(source_id);
     source_node->set_edge_weight(target_id, new_weight);
 
-    Node *target_node = nodes.at(target_id);
+    Node *target_node = get_node(target_id);
     target_node->set_edge_weight(source_id, new_weight);
 }
 

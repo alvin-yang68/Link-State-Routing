@@ -37,7 +37,7 @@ class Graph
 {
 public:
     Node *get_node(int id);
-    void register_node(Node *node);
+    Node *register_node(Node *node);
     void set_edge_weight_pairs(int source_id, int target_id, int new_weight);
     bool accept_lsa(LSA &lsa);
 
