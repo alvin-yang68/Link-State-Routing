@@ -94,13 +94,7 @@ bool Graph::accept_lsa(LSA &lsa)
 {
     int target_id = lsa.origin_id;
 
-    if (!has_node(target_id))
-    {
-        Node *new_node = new Node(target_id);
-        nodes.insert(make_pair(target_id, new_node));
-    }
-
-    Node *target_node = nodes[target_id];
+    Node *target_node = get_node(target_id);
 
     if (lsa.sequence_num <= target_node->sequence_num)
         return false;
