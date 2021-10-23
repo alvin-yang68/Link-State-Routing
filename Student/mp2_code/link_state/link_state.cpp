@@ -180,7 +180,7 @@ void LinkState::handle_lsa_command(const char *recv_buffer, size_t recv_buffer_l
 void LinkState::handle_send_or_forward_command(const char *recv_buffer, bool is_from_manager)
 {
     // recv_buffer format: 'send'<4 ASCII bytes>, destID<net order 2 byte signed>, <some ASCII message>
-    int destination_id = extract_int(recv_buffer + 4, 2);
+    int destination_id = extract_short(recv_buffer + 4);
     const char *message = recv_buffer + 6;
 
     if (destination_id == self_id)
@@ -207,24 +207,11 @@ void LinkState::handle_send_or_forward_command(const char *recv_buffer, bool is_
         output_log.add_forward_entry(destination_id, next_hop_id, message);
 }
 
-// Extracts a number from network buffer and returns it in host order
-int LinkState::extract_int(const char *network_buffer, size_t size)
-{
-    char number[size + 1];
-    strncpy(number, network_buffer, size + 1); // `size + 1` to ensure the last char is a NULL
-
-    // TODO: Divide this method into short and long versions
-    if (size <= 2)
-        return ntohs(atoi(number)); // short int
-    else
-        return ntohl(atoi(number)); // long int
-}
-
 void LinkState::handle_cost_command(const char *recv_buffer)
 {
     // recv_buffer format: 'cost'<4 ASCII bytes>, destID<net order 2 byte signed> newCost<net order 4 byte signed>
-    int destination_id = extract_int(recv_buffer + 4, 2);
-    int new_weight = extract_int(recv_buffer + 6, 4);
+    int destination_id = extract_short(recv_buffer + 4);
+    int new_weight = extract_long(recv_buffer + 6);
 
     graph.set_edge_weight_pairs(self_id, destination_id, new_weight);
 }
