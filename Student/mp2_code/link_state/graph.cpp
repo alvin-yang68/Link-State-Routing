@@ -57,7 +57,7 @@ LSA Node::generate_lsa()
 
     for (const int &id : neighbors)
     {
-        lsa.add_weight(id, edge_weights[id]);
+        lsa.add_weight(id, get_edge_weight(id));
     }
 
     return lsa;
