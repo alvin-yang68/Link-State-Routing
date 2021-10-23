@@ -66,7 +66,7 @@ void LinkState::send_lsa_to_neighbors()
 
     size_t buffer_len;
     char buffer[5000];
-    buffer_len = sprintf(buffer, "lsa", serialized_lsa);
+    buffer_len = sprintf(buffer, "lsa%s", serialized_lsa);
 
     for (const int &id : self_node->neighbors)
     {
