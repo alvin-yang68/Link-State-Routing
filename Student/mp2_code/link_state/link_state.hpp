@@ -28,10 +28,9 @@ private:
     Graph graph;
     RouteFinder route_finder;
     void set_initial_costs(const char *filename);
-    void send_initial_lsa();
-    void send_lsa_to_neighbors();
     void broadcast_heartbeats(struct timespec heartbeat_interval);
     void monitor_heartbeats(struct timespec checkup_interval, int timeout_tolerance);
+    void send_lsa_to_neighbors();
     void listen_for_neighbors();
     int get_neighbor_id(const char *neighbor_addr);
     bool has_prefix(const char *recv_buffer, const char *prefix);
