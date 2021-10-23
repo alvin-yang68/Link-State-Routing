@@ -21,7 +21,7 @@ class Socket
 {
 public:
     Socket(int self_id);
-    size_t receive(char *buffer, int length, struct sockaddr_in their_addr);
+    size_t receive(char *buffer, struct sockaddr_in *their_addr);
     void send(int target_id, const char *buffer, int length);
     void broadcast(const char *buffer, int length);
     void close_socket();
@@ -37,6 +37,6 @@ private:
 class LsaSerializer
 {
 public:
-    int serialize(const LSA &lsa, char *buffer, size_t buffer_len);
+    size_t serialize(const LSA &lsa, char *buffer, size_t buffer_len);
     void deserialize(const char *buffer, size_t buffer_len, LSA *lsa);
 };

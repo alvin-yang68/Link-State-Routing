@@ -49,13 +49,13 @@ void Socket::init_socket()
     }
 }
 
-size_t Socket::receive(char *buffer, int len, struct sockaddr_in neighbor_sockaddr)
+size_t Socket::receive(char *buffer, struct sockaddr_in *neighbor_sockaddr)
 {
     size_t bytes_received;
-    socklen_t neighbor_sockaddr_len;
+    socklen_t neighbor_sockaddr_len = sizeof(*neighbor_sockaddr);
 
-    if ((bytes_received = recvfrom(socket_fd, buffer, len, 0,
-                                   (struct sockaddr *)&neighbor_sockaddr, &neighbor_sockaddr_len)) == -1)
+    if ((bytes_received = recvfrom(socket_fd, buffer, sizeof(buffer), 0,
+                                   (struct sockaddr *)neighbor_sockaddr, &neighbor_sockaddr_len)) == -1)
     {
         perror("Socket: recvfrom");
         exit(1);
@@ -83,21 +83,21 @@ void Socket::close_socket()
     close(socket_fd);
 }
 
-int LsaSerializer::serialize(const LSA &lsa, char *buffer, size_t buffer_len)
+size_t LsaSerializer::serialize(const LSA &lsa, char *buffer, size_t buffer_len)
 {
-    int current_len = 0;
+    size_t idx = 0;
 
-    current_len += add_short(lsa.origin_id, buffer + current_len);
-    current_len += add_long(lsa.sequence_num, buffer + current_len);
+    idx += add_short(lsa.origin_id, buffer + idx);
+    idx += add_long(lsa.sequence_num, buffer + idx);
 
     for (const EdgeToNeighbor &edge : lsa.edges)
     {
-        current_len += add_short(edge.neighbor_id, buffer + current_len);
-        current_len += add_long(edge.weight, buffer + current_len);
+        idx += add_short(edge.neighbor_id, buffer + idx);
+        idx += add_long(edge.weight, buffer + idx);
     }
 
-    buffer[current_len] = '\0';
-    return current_len;
+    buffer[idx] = '\0';
+    return idx;
 }
 
 void LsaSerializer::deserialize(const char *buffer, size_t buffer_len, LSA *lsa)
