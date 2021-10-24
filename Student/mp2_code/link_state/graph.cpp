@@ -7,7 +7,7 @@
 
 using namespace std;
 
-Node::Node(int id) : id{id}, sequence_num{-1}, neighbors{}, edge_weights{}
+Node::Node(int id) : id{id}, sequence_num{0}, neighbors{}, edge_weights{}
 {
     edge_weights.insert(make_pair(id, 0)); // Edge weight to itself is zero
 }
@@ -19,11 +19,6 @@ Node::Node(const Node &obj) : id{obj.id}, sequence_num{obj.sequence_num}, neighb
 void Node::insert_neighbor(int target)
 {
     neighbors.insert(target);
-}
-
-bool Node::has_neighbor(int target)
-{
-    return neighbors.find(target) == neighbors.end();
 }
 
 int Node::get_edge_weight(int target)
@@ -65,14 +60,15 @@ LSA Node::generate_lsa()
 
 Node *Graph::get_node(int id)
 {
-    try
-    {
+    if (has_node(id))
         return nodes.at(id);
-    }
-    catch (const out_of_range &e)
-    {
-        return register_node(new Node(id));
-    }
+
+    return register_node(new Node(id));
+}
+
+bool Graph::has_node(int target)
+{
+    return nodes.find(target) != nodes.end();
 }
 
 Node *Graph::register_node(Node *node)
@@ -104,15 +100,10 @@ bool Graph::accept_lsa(LSA &lsa)
 
     for (const struct EdgeToNeighbor &new_edge : lsa.edges)
     {
-        set_edge_weight_pairs(target_id, new_edge.neighbor_id, new_edge.weight);
+        target_node->set_edge_weight(new_edge.neighbor_id, new_edge.weight);
     }
 
     return true;
-}
-
-bool Graph::has_node(int target)
-{
-    return nodes.find(target) == nodes.end();
 }
 
 RouteFinder::RouteFinder(int self_id) : self_id{self_id}

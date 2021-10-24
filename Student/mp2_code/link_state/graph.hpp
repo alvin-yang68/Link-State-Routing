@@ -22,7 +22,6 @@ public:
     Node(const Node &obj);
     Node(int id);
     void insert_neighbor(int target);
-    bool has_neighbor(int target);
     int get_edge_weight(int target);
     void set_edge_weight(int target, int new_weight);
     LSA generate_lsa();
