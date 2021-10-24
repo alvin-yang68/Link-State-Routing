@@ -185,7 +185,7 @@ void LinkState::handle_lsa_command(const char *recv_buffer, size_t message_len, 
 void LinkState::handle_send_or_forward_command(const char *recv_buffer, bool is_from_manager)
 {
     // recv_buffer format: 'send'<4 ASCII bytes>, destID<net order 2 byte signed>, <some ASCII message>
-    int destination_id = extract_short(recv_buffer + 4);
+    short int destination_id = extract_short(recv_buffer + 4);
     const char *message = recv_buffer + 6;
 
     if (destination_id == self_id)
@@ -203,7 +203,13 @@ void LinkState::handle_send_or_forward_command(const char *recv_buffer, bool is_
     }
 
     char forward_command[5000];
-    int length = sprintf(forward_command, "frwd%d%s", htons(destination_id), message);
+    int length = 0;
+
+    length += sprintf(forward_command, "frwd");
+    length += add_short(destination_id, forward_command + length);
+    strcpy(forward_command + length, message);
+    length += strlen(message);
+
     socket.send(next_hop_id, forward_command, length);
 
     if (is_from_manager)
