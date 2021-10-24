@@ -16,18 +16,5 @@ public:
 
 private:
     FILE *file_handler;
+    void write_to_file(const char *log_line, int line_length);
 };
-
-// template <typename... Args>
-// string string_format(const string &format, Args... args)
-// {
-//     int size_s = snprintf(nullptr, 0, format.c_str(), args...) + 1; // Extra space for '\0'
-//     if (size_s <= 0)
-//     {
-//         throw runtime_error("Error during formatting.");
-//     }
-//     auto size = static_cast<size_t>(size_s);
-//     auto buf = make_unique<char[]>(size);
-//     snprintf(buf.get(), size, format.c_str(), args...);
-//     return string(buf.get(), buf.get() + size - 1); // We don't want the '\0' inside
-// }
