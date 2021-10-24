@@ -10,7 +10,7 @@ class HeartbeatsTracker
 public:
     HeartbeatsTracker();
     void register_heartbeat(int target_id);
-    unordered_set<int> get_online_nodes(int timeout_tolerance);
+    unordered_set<int> get_online_nodes(long int timeout_tolerance_ms);
 
 private:
     struct timeval last_heartbeats[256];
@@ -18,4 +18,4 @@ private:
 };
 
 // Returns the difference between two timevals in milliseconds
-int subtract_timevals(struct timeval &a, struct timeval &b);
+long int subtract_timevals_ms(struct timeval &a, struct timeval &b);

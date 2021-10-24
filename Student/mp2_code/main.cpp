@@ -5,11 +5,9 @@
 
 #include "link_state/link_state.hpp"
 
-#define HEARTBEAT_INTERVAL_SEC 0
-#define HEARTBEAT_INTERVAL_NSEC 500 * 1000 * 1000 // 500ms
-#define CHECKUP_INTERVAL_SEC 1
-#define CHECKUP_INTERVAL_NSEC 500 * 1000 * 1000 // 500ms
-#define TIMEOUT_TOLERANCE_SEC 1
+#define HEARTBEAT_INTERVAL_MS 1000
+#define CHECKUP_INTERVAL_MS 2000
+#define TIMEOUT_TOLERANCE_MS 2000
 
 int main(int argc, char **argv)
 {
@@ -25,13 +23,5 @@ int main(int argc, char **argv)
 
 	LinkState ls = LinkState(self_id, cost_file_name, log_file_name);
 
-	struct timespec heartbeat_interval;
-	heartbeat_interval.tv_sec = HEARTBEAT_INTERVAL_SEC;
-	heartbeat_interval.tv_nsec = HEARTBEAT_INTERVAL_NSEC;
-
-	struct timespec checkup_interval;
-	checkup_interval.tv_sec = CHECKUP_INTERVAL_SEC;
-	checkup_interval.tv_nsec = CHECKUP_INTERVAL_NSEC;
-
-	ls.monitor_neighborhood(heartbeat_interval, checkup_interval, TIMEOUT_TOLERANCE_SEC);
+	ls.monitor_neighborhood(HEARTBEAT_INTERVAL_MS, CHECKUP_INTERVAL_MS, TIMEOUT_TOLERANCE_MS);
 }

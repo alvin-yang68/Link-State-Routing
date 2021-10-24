@@ -32,19 +32,21 @@ void LinkState::set_initial_costs(const char *filename)
     }
 }
 
-void LinkState::monitor_neighborhood(struct timespec heartbeat_interval, struct timespec checkup_interval, int timeout_tolerance)
+void LinkState::monitor_neighborhood(long int heartbeat_interval_ms, long int checkup_interval_ms, long int timeout_tolerance_ms)
 {
     thread listen_for_neighbors_thread(&LinkState::listen_for_neighbors, this);
-    thread broadcast_heartbeats_thread(&LinkState::broadcast_heartbeats, this, heartbeat_interval);
-    thread update_neighbors_thread(&LinkState::monitor_heartbeats, this, checkup_interval, timeout_tolerance);
+    thread broadcast_heartbeats_thread(&LinkState::broadcast_heartbeats, this, heartbeat_interval_ms);
+    thread update_neighbors_thread(&LinkState::monitor_heartbeats, this, checkup_interval_ms, timeout_tolerance_ms);
 
     listen_for_neighbors_thread.join();
     broadcast_heartbeats_thread.join();
     update_neighbors_thread.join();
 }
 
-void LinkState::broadcast_heartbeats(struct timespec heartbeat_interval)
+void LinkState::broadcast_heartbeats(long int heartbeat_interval_ms)
 {
+    struct timespec heartbeat_interval = generate_timespec_from_ms(heartbeat_interval_ms);
+
     while (1)
     {
         socket.broadcast("ALIVE", 5);
@@ -52,9 +54,11 @@ void LinkState::broadcast_heartbeats(struct timespec heartbeat_interval)
     }
 }
 
-void LinkState::monitor_heartbeats(struct timespec checkup_interval, int timeout_tolerance)
+void LinkState::monitor_heartbeats(long int checkup_interval_ms, long int timeout_tolerance_ms)
 {
     Node *self_node = graph.get_node(self_id);
+
+    struct timespec checkup_interval = generate_timespec_from_ms(checkup_interval_ms);
 
     unsigned int counter = 0;
 
@@ -62,7 +66,18 @@ void LinkState::monitor_heartbeats(struct timespec checkup_interval, int timeout
     {
         nanosleep(&checkup_interval, 0); // We sleep first because `globalLastHeartbeat` was initialized to the time when the program was started
 
-        unordered_set<int> online_neighbors = hb_tracker.get_online_nodes(timeout_tolerance);
+        unordered_set<int> online_neighbors = hb_tracker.get_online_nodes(timeout_tolerance_ms);
+        // if (!online_neighbors.empty())
+        // {
+        //     std::cout << counter << " online_neighbors: ";
+        //     for (auto it = online_neighbors.begin(); it != online_neighbors.end(); ++it)
+        //         std::cout << " " << *it;
+        //     std::cout << std::endl;
+        //     std::cout << counter << " self_node->neighbors: ";
+        //     for (auto it = self_node->neighbors.begin(); it != self_node->neighbors.end(); ++it)
+        //         std::cout << " " << *it;
+        //     std::cout << std::endl;
+        // }
         if (online_neighbors != self_node->neighbors)
         {
             self_node->neighbors = online_neighbors;
@@ -204,4 +219,16 @@ void LinkState::handle_cost_command(const char *recv_buffer)
     int new_weight = extract_long(recv_buffer + 6);
 
     graph.set_edge_weight_pairs(self_id, destination_id, new_weight);
+}
+
+struct timespec generate_timespec_from_ms(long int ms)
+{
+    long int floor_sec = ms / 1000;
+    long int remainder_ms = ms - (floor_sec * 1000);
+
+    struct timespec interval;
+    interval.tv_sec = floor_sec;
+    interval.tv_nsec = remainder_ms * 1000000;
+
+    return interval;
 }
