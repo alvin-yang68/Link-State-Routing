@@ -105,18 +105,18 @@ void LsaSerializer::deserialize(const char *buffer, size_t buffer_len, LSA *lsa)
     int idx = 0;
 
     lsa->origin_id = extract_short(buffer + idx);
-    idx += sizeof(short int);
+    idx += sizeof(uint16_t);
 
     lsa->sequence_num = extract_long(buffer + idx);
-    idx += sizeof(long int);
+    idx += sizeof(uint32_t);
 
     while (idx < buffer_len)
     {
-        int neighbor_id = extract_short(buffer + idx);
-        idx += sizeof(short int);
+        uint16_t neighbor_id = extract_short(buffer + idx);
+        idx += sizeof(uint16_t);
 
-        int edge_weight = extract_long(buffer + idx);
-        idx += sizeof(long int);
+        uint32_t edge_weight = extract_long(buffer + idx);
+        idx += sizeof(uint32_t);
 
         lsa->add_weight(neighbor_id, edge_weight);
     }

@@ -82,13 +82,11 @@ void LinkState::monitor_heartbeats(long int checkup_interval_ms, long int timeou
         {
             self_node->neighbors = online_neighbors;
             self_node->sequence_num += 1;
-
-            if (counter % LSA_FREQUENCY == 0)
-                send_lsa_to_neighbors();
-
-            if (counter % DIJKSTRA_FREQUENCY == 0)
-                route_finder.run_dijkstra();
+            send_lsa_to_neighbors();
         }
+
+        if (counter % DIJKSTRA_FREQUENCY == 0)
+            route_finder.run_dijkstra();
 
         counter++;
     }
@@ -127,7 +125,7 @@ void LinkState::listen_for_neighbors()
         // Extract the IP address of the sender and assign it to `neighbor_addr`
         inet_ntop(AF_INET, &neighbor_sockaddr.sin_addr, neighbor_addr, 100);
 
-        short int neighbor_id = get_neighbor_id(neighbor_addr); // Set to -1 if sender was the manager
+        int neighbor_id = get_neighbor_id(neighbor_addr); // Set to -1 if sender was the manager
         bool is_from_manager = neighbor_id == -1 ? true : false;
 
         if (has_prefix(recv_buffer, "ALIVE"))
@@ -149,7 +147,7 @@ void LinkState::listen_for_neighbors()
 
 int LinkState::get_neighbor_id(const char *neighbor_addr)
 {
-    short int neighbor_id = -1;
+    int neighbor_id = -1;
     if (strstr(neighbor_addr, "10.1.1."))
     {
         neighbor_id = atoi(
@@ -168,6 +166,15 @@ void LinkState::handle_lsa_command(const char *recv_buffer, size_t message_len, 
     LSA lsa;
     lsa_serializer.deserialize(recv_buffer + 3, message_len - 3, &lsa);
 
+    std::cout << "I am: " << self_id;
+    std::cout << ", received from: " << from_id;
+    std::cout << ", origin id: " << lsa.origin_id;
+    std::cout << ", seq num: " << lsa.sequence_num;
+    std::cout << ", for neighbors: ";
+    for (const struct EdgeToNeighbor edge : lsa.edges)
+        std::cout << edge.neighbor_id << " " << edge.weight << ", ";
+    std::cout << std::endl;
+
     if (!graph.accept_lsa(lsa)) // If stale LSA, then do nothing
         return;
 
@@ -175,17 +182,17 @@ void LinkState::handle_lsa_command(const char *recv_buffer, size_t message_len, 
     for (const int &id : self_node->neighbors)
     {
         // Forward LSA to our neighbors, but don't send the LSA back to the neighbor who sent it to us
-        if (id != from_id)
+        if (id != from_id && id != lsa.origin_id)
             socket.send(id, recv_buffer, message_len);
     }
 
-    route_finder.run_dijkstra();
+    // route_finder.run_dijkstra();
 }
 
 void LinkState::handle_send_or_forward_command(const char *recv_buffer, bool is_from_manager)
 {
     // recv_buffer format: 'send'<4 ASCII bytes>, destID<net order 2 byte signed>, <some ASCII message>
-    short int destination_id = extract_short(recv_buffer + 4);
+    uint16_t destination_id = extract_short(recv_buffer + 4);
     const char *message = recv_buffer + 6;
 
     if (destination_id == self_id)
@@ -221,8 +228,8 @@ void LinkState::handle_send_or_forward_command(const char *recv_buffer, bool is_
 void LinkState::handle_cost_command(const char *recv_buffer)
 {
     // recv_buffer format: 'cost'<4 ASCII bytes>, destID<net order 2 byte signed> newCost<net order 4 byte signed>
-    int destination_id = extract_short(recv_buffer + 4);
-    int new_weight = extract_long(recv_buffer + 6);
+    uint16_t destination_id = extract_short(recv_buffer + 4);
+    uint32_t new_weight = extract_long(recv_buffer + 6);
 
     graph.set_edge_weight_pairs(self_id, destination_id, new_weight);
 }

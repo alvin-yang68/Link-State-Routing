@@ -1,29 +1,29 @@
 #include "utils.hpp"
 
-int add_short(short int num, char *buffer)
+int add_short(uint16_t num, char *buffer)
 {
-    short int network_num = htons(num);
-    memcpy(buffer, &network_num, sizeof(short int));
-    return sizeof(short int);
+    uint16_t network_num = htons(num);
+    memcpy(buffer, &network_num, sizeof(uint16_t));
+    return sizeof(uint16_t);
 }
 
-int add_long(long int num, char *buffer)
+int add_long(uint32_t num, char *buffer)
 {
-    long int network_num = htonl(num);
-    memcpy(buffer, &network_num, sizeof(long int));
-    return sizeof(long int);
+    uint32_t network_num = htonl(num);
+    memcpy(buffer, &network_num, sizeof(uint32_t));
+    return sizeof(uint32_t);
 }
 
-short int extract_short(const char *buffer)
+uint16_t extract_short(const char *buffer)
 {
-    short int network_num;
-    memcpy(&network_num, buffer, sizeof(short int));
+    uint16_t network_num;
+    memcpy(&network_num, buffer, sizeof(uint16_t));
     return ntohs(network_num);
 }
 
-long int extract_long(const char *buffer)
+uint32_t extract_long(const char *buffer)
 {
-    long int network_num;
-    memcpy(&network_num, buffer, sizeof(long int));
+    uint32_t network_num;
+    memcpy(&network_num, buffer, sizeof(uint32_t));
     return ntohl(network_num);
 }
