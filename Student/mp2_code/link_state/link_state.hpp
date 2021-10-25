@@ -10,7 +10,6 @@
 #include "graph.hpp"
 #include "heartbeats.hpp"
 
-#define LSA_FREQUENCY 1
 #define DIJKSTRA_FREQUENCY 1
 
 class LinkState
@@ -21,6 +20,7 @@ public:
 
 private:
     int self_id;
+    bool graph_updated;
     Socket socket;
     LsaSerializer lsa_serializer;
     Log output_log;

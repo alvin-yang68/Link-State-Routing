@@ -1,6 +1,6 @@
 #include "link_state.hpp"
 
-LinkState::LinkState(int self_id, const char *cost_file_name, const char *log_file_name) : self_id{self_id}, socket{Socket(self_id)}, lsa_serializer{LsaSerializer()}, output_log{Log(log_file_name)}, hb_tracker{HeartbeatsTracker()}, graph{Graph()}, route_finder{RouteFinder(self_id)}
+LinkState::LinkState(int self_id, const char *cost_file_name, const char *log_file_name) : self_id{self_id}, graph_updated{false}, socket{Socket(self_id)}, lsa_serializer{LsaSerializer()}, output_log{Log(log_file_name)}, hb_tracker{HeartbeatsTracker()}, graph{Graph()}, route_finder{RouteFinder(self_id)}
 {
     graph.register_node(new Node(self_id));
     route_finder.register_graph(&graph);
@@ -34,11 +34,11 @@ void LinkState::set_initial_costs(const char *filename)
 
 void LinkState::monitor_neighborhood(long int heartbeat_interval_ms, long int checkup_interval_ms, long int timeout_tolerance_ms)
 {
-    thread listen_for_neighbors_thread(&LinkState::listen_for_neighbors, this);
     thread broadcast_heartbeats_thread(&LinkState::broadcast_heartbeats, this, heartbeat_interval_ms);
     thread update_neighbors_thread(&LinkState::monitor_heartbeats, this, checkup_interval_ms, timeout_tolerance_ms);
 
-    listen_for_neighbors_thread.join();
+    listen_for_neighbors();
+
     broadcast_heartbeats_thread.join();
     update_neighbors_thread.join();
 }
@@ -59,8 +59,6 @@ void LinkState::monitor_heartbeats(long int checkup_interval_ms, long int timeou
     Node *self_node = graph.get_node(self_id);
 
     struct timespec checkup_interval = generate_timespec_from_ms(checkup_interval_ms);
-
-    unsigned int counter = 0;
 
     while (1)
     {
@@ -83,12 +81,24 @@ void LinkState::monitor_heartbeats(long int checkup_interval_ms, long int timeou
             self_node->neighbors = online_neighbors;
             self_node->sequence_num += 1;
             send_lsa_to_neighbors();
+
+            graph_updated = true;
+
+            // struct timeval now;
+            // gettimeofday(&now, 0);
+            // std::cout << now.tv_sec << ", " << now.tv_usec;
+            // std::cout << ", I am: " << self_node->id;
+            // std::cout << ", my neighbors: ";
+            // for (const int id : online_neighbors)
+            //     std::cout << id << " ";
+            // std::cout << std::endl;
         }
 
-        if (counter % DIJKSTRA_FREQUENCY == 0)
+        if (graph_updated)
+        {
+            graph_updated = false;
             route_finder.run_dijkstra();
-
-        counter++;
+        }
     }
 }
 
@@ -166,24 +176,64 @@ void LinkState::handle_lsa_command(const char *recv_buffer, size_t message_len, 
     LSA lsa;
     lsa_serializer.deserialize(recv_buffer + 3, message_len - 3, &lsa);
 
-    std::cout << "I am: " << self_id;
-    std::cout << ", received from: " << from_id;
-    std::cout << ", origin id: " << lsa.origin_id;
-    std::cout << ", seq num: " << lsa.sequence_num;
-    std::cout << ", for neighbors: ";
-    for (const struct EdgeToNeighbor edge : lsa.edges)
-        std::cout << edge.neighbor_id << " " << edge.weight << ", ";
-    std::cout << std::endl;
+    // std::cout << "I am: " << self_id;
+    // std::cout << ", received from: " << from_id;
+    // std::cout << ", origin id: " << lsa.origin_id;
+    // std::cout << ", seq num: " << lsa.sequence_num;
+    // std::cout << ", for neighbors: ";
+    // for (const struct EdgeToNeighbor edge : lsa.edges)
+    //     std::cout << edge.neighbor_id << " " << edge.weight << ", ";
+    // std::cout << std::endl;
 
     if (!graph.accept_lsa(lsa)) // If stale LSA, then do nothing
         return;
 
+    graph_updated = true;
+
+    // std::cout << "I am: " << self_id;
+    // std::cout << ", received from: " << from_id;
+    // std::cout << ", origin id: " << lsa.origin_id;
+    // std::cout << ", seq num: " << lsa.sequence_num;
+    // std::cout << std::endl;
+
     Node *self_node = graph.get_node(self_id);
-    for (const int &id : self_node->neighbors)
+    unordered_set<int> neighbors = self_node->neighbors; // Copy to avoid data race
+
+    struct timeval now;
+    gettimeofday(&now, 0);
+    std::cout << now.tv_sec << ", " << now.tv_usec;
+    std::cout << ", I am: " << self_id;
+    std::cout << ", received from: " << from_id;
+    std::cout << ", origin id: " << lsa.origin_id;
+    std::cout << ", seq num: " << lsa.sequence_num;
+    std::cout << ", my neighbors: ";
+    for (const int id : self_node->neighbors)
+        std::cout << id << " ";
+    std::cout << std::endl;
+
+    for (const int id : neighbors)
     {
         // Forward LSA to our neighbors, but don't send the LSA back to the neighbor who sent it to us
         if (id != from_id && id != lsa.origin_id)
+        {
+            // struct timeval now;
+            // gettimeofday(&now, 0);
+            // std::cout << now.tv_sec << ", " << now.tv_usec;
+            // std::cout << ", I am: " << self_id;
+            // std::cout << ", forwarding to: " << id;
+            // std::cout << ", received from: " << from_id;
+            // std::cout << ", origin id: " << lsa.origin_id;
+            // std::cout << ", seq num: " << lsa.sequence_num;
+            // std::cout << ", my neighbors: ";
+            // for (const int id : self_node->neighbors)
+            // std::cout << id << " ";
+            // std::cout << ", for neighbors: ";
+            // for (const struct EdgeToNeighbor edge : lsa.edges)
+            //     std::cout << edge.neighbor_id << " " << edge.weight << ", ";
+            // std::cout << std::endl;
+
             socket.send(id, recv_buffer, message_len);
+        }
     }
 
     // route_finder.run_dijkstra();
