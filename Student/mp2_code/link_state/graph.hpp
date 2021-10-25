@@ -28,15 +28,18 @@ public:
 
 private:
     unordered_map<int, int> edge_weights;
-    void set_edge_weights(vector<struct EdgeToNeighbor> new_weights);
+    void init_node(int max_size);
+    bool has_edge_weight(int target);
 };
 
 /** Maintains the network topology, including information about the shortest paths **/
 class Graph
 {
 public:
+    Graph();
     Node *get_node(int id);
     Node *register_node(Node *node);
+    const unordered_map<int, Node *> &get_nodes() const;
     void set_edge_weight_pairs(int source_id, int target_id, int new_weight);
     bool accept_lsa(LSA &lsa);
 
@@ -56,10 +59,13 @@ public:
 private:
     const int self_id;
     Graph *graph;
+    unordered_map<int, Node *> nodes_snapshot;
     vector<int> distances;
     vector<int> predecessors;
     priority_queue<EdgeToNeighbor, vector<EdgeToNeighbor>, CompareWeight> frontier;
     void reset_states();
+    void save_nodes_snapshot();
+    Node *get_node_from_snapshot(int id);
 };
 
 template <class Q>

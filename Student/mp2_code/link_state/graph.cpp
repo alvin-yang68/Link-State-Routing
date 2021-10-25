@@ -7,13 +7,27 @@
 
 using namespace std;
 
-Node::Node(int id) : id{id}, sequence_num{0}, neighbors{}, edge_weights{}
-{
-    edge_weights.insert(make_pair(id, 0)); // Edge weight to itself is zero
-}
-
 Node::Node(const Node &obj) : id{obj.id}, sequence_num{obj.sequence_num}, neighbors(obj.neighbors), edge_weights(obj.edge_weights)
 {
+}
+
+Node::Node(int id) : id{id}, sequence_num{0}, neighbors{}, edge_weights{}
+{
+    init_node(NUM_OF_NODES);
+}
+
+void Node::init_node(int max_size)
+{
+    neighbors.reserve(max_size);
+    for (int i = 0; i < max_size; i++)
+    {
+        if (i == id)
+            continue;
+        neighbors.insert(i);
+    }
+
+    edge_weights.reserve(max_size);
+    edge_weights.insert(make_pair(id, 0)); // Edge weight to itself is zero
 }
 
 void Node::insert_neighbor(int target)
@@ -23,27 +37,20 @@ void Node::insert_neighbor(int target)
 
 int Node::get_edge_weight(int target)
 {
-    try
-    {
+    if (has_edge_weight(target))
         return edge_weights.at(target);
-    }
-    catch (const out_of_range &e)
-    {
-        return 1;
-    }
+
+    return 1;
+}
+
+bool Node::has_edge_weight(int target)
+{
+    return edge_weights.find(target) != edge_weights.end();
 }
 
 void Node::set_edge_weight(int target, int new_weight)
 {
     edge_weights[target] = new_weight;
-}
-
-void Node::set_edge_weights(vector<struct EdgeToNeighbor> new_edges)
-{
-    for (struct EdgeToNeighbor &edge : new_edges)
-    {
-        set_edge_weight(edge.neighbor_id, edge.weight);
-    }
 }
 
 LSA Node::generate_lsa()
@@ -56,6 +63,11 @@ LSA Node::generate_lsa()
     }
 
     return lsa;
+}
+
+Graph::Graph() : nodes{}
+{
+    nodes.reserve(NUM_OF_NODES);
 }
 
 Node *Graph::get_node(int id)
@@ -77,6 +89,11 @@ Node *Graph::register_node(Node *node)
     return node;
 }
 
+const unordered_map<int, Node *> &Graph::get_nodes() const
+{
+    return nodes;
+}
+
 void Graph::set_edge_weight_pairs(int source_id, int target_id, int new_weight)
 {
     Node *source_node = get_node(source_id);
@@ -96,18 +113,20 @@ bool Graph::accept_lsa(LSA &lsa)
         return false;
 
     target_node->sequence_num = lsa.sequence_num;
-    target_node->neighbors = lsa.get_neighbors();
+    target_node->neighbors.clear();
 
     for (const struct EdgeToNeighbor &new_edge : lsa.edges)
     {
+        target_node->neighbors.insert(new_edge.neighbor_id);
         target_node->set_edge_weight(new_edge.neighbor_id, new_edge.weight);
     }
 
     return true;
 }
 
-RouteFinder::RouteFinder(int self_id) : self_id{self_id}
+RouteFinder::RouteFinder(int self_id) : self_id{self_id}, nodes_snapshot{}
 {
+    nodes_snapshot.reserve(NUM_OF_NODES);
 }
 
 void RouteFinder::register_graph(Graph *graph)
@@ -118,6 +137,8 @@ void RouteFinder::register_graph(Graph *graph)
 void RouteFinder::run_dijkstra()
 {
     reset_states();
+    save_nodes_snapshot();
+
     frontier.push({.neighbor_id = self_id, .weight = distances[self_id]});
 
     while (!frontier.empty())
@@ -125,7 +146,7 @@ void RouteFinder::run_dijkstra()
         const int curr_id = frontier.top().neighbor_id;
         frontier.pop();
 
-        Node *curr_node = graph->get_node(curr_id);
+        Node *curr_node = get_node_from_snapshot(curr_id);
 
         for (const int neighbor_id : curr_node->neighbors)
         {
@@ -154,6 +175,27 @@ void RouteFinder::reset_states()
     predecessors[self_id] = self_id;
 
     clear_queue(frontier);
+
+    nodes_snapshot.clear();
+}
+
+void RouteFinder::save_nodes_snapshot()
+{
+    for (const pair<int, Node *> &kv : graph->get_nodes())
+    {
+        nodes_snapshot.insert(make_pair(kv.first, new Node(*kv.second)));
+    }
+}
+
+Node *RouteFinder::get_node_from_snapshot(int id)
+{
+    if (nodes_snapshot.find(id) != nodes_snapshot.end())
+        return nodes_snapshot.at(id);
+
+    Node *new_node = new Node(id);
+    nodes_snapshot.insert(make_pair(id, new_node));
+
+    return new_node;
 }
 
 int RouteFinder::find_next_hop(int destination_id)
