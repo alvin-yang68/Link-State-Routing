@@ -9,7 +9,7 @@
 #include "link_state/types.hpp"
 #include "link_state/lsa.hpp"
 
-#define NUM_OF_NODES 256
+#include "common/config.hpp"
 
 using namespace std;
 
@@ -40,7 +40,6 @@ public:
     Node *get_node(int id);
     Node *register_node(Node *node);
     const unordered_map<int, Node *> &get_nodes() const;
-    void set_edge_weight_pairs(int source_id, int target_id, int new_weight);
     bool accept_lsa(LSA &lsa);
 
 private:

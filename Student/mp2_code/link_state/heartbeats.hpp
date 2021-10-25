@@ -3,6 +3,8 @@
 #include <sys/time.h>
 #include <unordered_set>
 
+#include "common/config.hpp"
+
 using namespace std;
 
 class HeartbeatsTracker

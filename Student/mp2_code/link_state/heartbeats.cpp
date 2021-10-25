@@ -9,7 +9,7 @@ HeartbeatsTracker::HeartbeatsTracker()
 
 void HeartbeatsTracker::set_initial_heartbeats()
 {
-    for (int i = 0; i < 256; i++)
+    for (int i = 0; i < NUM_OF_NODES; i++)
     {
         gettimeofday(&last_heartbeats[i], 0);
     }
@@ -23,12 +23,12 @@ void HeartbeatsTracker::register_heartbeat(int target_id)
 unordered_set<int> HeartbeatsTracker::get_online_nodes(long int timeout_tolerance_ms)
 {
     unordered_set<int> online_nodes;
-    online_nodes.reserve(256);
+    online_nodes.reserve(NUM_OF_NODES);
 
     struct timeval now;
     gettimeofday(&now, 0);
 
-    for (int i = 0; i < 256; i++)
+    for (int i = 0; i < NUM_OF_NODES; i++)
     {
         if (subtract_timevals_ms(now, last_heartbeats[i]) <= timeout_tolerance_ms)
             online_nodes.insert(i);

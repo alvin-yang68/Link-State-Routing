@@ -14,7 +14,7 @@
 #include <netdb.h>
 
 #include "link_state/lsa.hpp"
-#include "utils.hpp"
+#include "common/utils.hpp"
 
 /* Handles socket IO to other nodes */
 class Socket

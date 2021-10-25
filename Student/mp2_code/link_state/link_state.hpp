@@ -5,7 +5,7 @@
 
 #include "io/network.hpp"
 #include "io/log.hpp"
-#include "io/utils.hpp"
+#include "common/utils.hpp"
 #include "lsa.hpp"
 #include "graph.hpp"
 #include "heartbeats.hpp"
