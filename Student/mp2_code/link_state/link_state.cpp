@@ -1,19 +1,22 @@
 #include "link_state.hpp"
 
+using namespace std;
+
 LinkState::LinkState(int self_id, const char *cost_file_name, const char *log_file_name) : self_id{self_id}, graph_updated{false}, socket{Socket(self_id)}, lsa_serializer{LsaSerializer()}, output_log{Log(log_file_name)}, hb_tracker{HeartbeatsTracker()}, graph{Graph()}, route_finder{RouteFinder(self_id)}
 {
-    graph.register_node(new Node(self_id));
+    Node self_node = create_self_node(cost_file_name);
+    graph.set_node(self_node);
+
     route_finder.register_graph(&graph);
-    set_initial_costs(cost_file_name);
 }
 
 // read and parse initial costs file. default to cost 1 if no entry for a node. file may be empty.
-void LinkState::set_initial_costs(const char *filename)
+Node LinkState::create_self_node(const char *filename)
 {
     ifstream file(filename);
     string line;
 
-    Node *self_node = graph.get_node(self_id);
+    Node self_node(self_id);
 
     while (getline(file, line))
     {
@@ -28,8 +31,10 @@ void LinkState::set_initial_costs(const char *filename)
             pair[i] = stoi(substr);
         }
 
-        self_node->set_edge_weight(pair[0], pair[1]);
+        self_node.set_edge_weight(pair[0], pair[1]);
     }
+
+    return self_node;
 }
 
 void LinkState::monitor_neighborhood(long int heartbeat_interval_ms, long int checkup_interval_ms, long int timeout_tolerance_ms)
@@ -56,42 +61,36 @@ void LinkState::broadcast_heartbeats(long int heartbeat_interval_ms)
 
 void LinkState::monitor_heartbeats(long int checkup_interval_ms, long int timeout_tolerance_ms)
 {
-    Node *self_node = graph.get_node(self_id);
-
     struct timespec checkup_interval = generate_timespec_from_ms(checkup_interval_ms);
 
     while (1)
     {
         nanosleep(&checkup_interval, 0); // We sleep first because `globalLastHeartbeat` was initialized to the time when the program was started
 
+        Node self_node = graph.get_node(self_id); // This will return a deep copy of the `Node` from `graph`
+
+        // cout << "I am: " << self_node.id << ", my seq num: " << self_node.sequence_num;
+        // std::cout << ", my neighbors: ";
+        // for (auto it = self_node.neighbors.begin(); it != self_node.neighbors.end(); ++it)
+        //     std::cout << " " << *it;
+        // cout << endl;
+
         unordered_set<int> online_neighbors = hb_tracker.get_online_nodes(timeout_tolerance_ms);
-        // if (!online_neighbors.empty())
-        // {
-        //     std::cout << counter << " online_neighbors: ";
-        //     for (auto it = online_neighbors.begin(); it != online_neighbors.end(); ++it)
-        //         std::cout << " " << *it;
-        //     std::cout << std::endl;
-        //     std::cout << counter << " self_node->neighbors: ";
-        //     for (auto it = self_node->neighbors.begin(); it != self_node->neighbors.end(); ++it)
-        //         std::cout << " " << *it;
-        //     std::cout << std::endl;
-        // }
-        if (online_neighbors != self_node->neighbors)
+        if (online_neighbors != self_node.neighbors)
         {
-            self_node->neighbors = online_neighbors;
-            self_node->sequence_num += 1;
-            send_lsa_to_neighbors();
+            self_node.neighbors = move(online_neighbors);
+            self_node.sequence_num += 1;
 
-            graph_updated = true;
-
-            // struct timeval now;
-            // gettimeofday(&now, 0);
-            // std::cout << now.tv_sec << ", " << now.tv_usec;
-            // std::cout << ", I am: " << self_node->id;
+            // cout << "I am: " << self_node.get_id() << ", my seq num: " << self_node.sequence_num;
             // std::cout << ", my neighbors: ";
-            // for (const int id : online_neighbors)
-            //     std::cout << id << " ";
+            // for (auto it = self_node.neighbors.begin(); it != self_node.neighbors.end(); ++it)
+            //     std::cout << " " << *it;
             // std::cout << std::endl;
+
+            graph.set_node(self_node); // Since `self_node` is a deep copy. Any changes to it must be copied back to the `graph` in order to update the "actual" node
+
+            send_lsa_to_neighbors();
+            graph_updated = true;
         }
 
         if (graph_updated)
@@ -104,8 +103,8 @@ void LinkState::monitor_heartbeats(long int checkup_interval_ms, long int timeou
 
 void LinkState::send_lsa_to_neighbors()
 {
-    Node *self_node = graph.get_node(self_id);
-    LSA lsa = self_node->generate_lsa();
+    Node self_node = graph.get_node(self_id);
+    LSA lsa = self_node.generate_lsa();
 
     size_t serialized_len;
     char serialized_lsa[4997];
@@ -115,7 +114,7 @@ void LinkState::send_lsa_to_neighbors()
     sprintf(buffer, "lsa");
     memcpy(buffer + 3, &serialized_lsa, serialized_len);
 
-    for (const int &id : self_node->neighbors)
+    for (const int &id : self_node.neighbors)
     {
         socket.send(id, buffer, 3 + serialized_len);
     }
@@ -190,28 +189,27 @@ void LinkState::handle_lsa_command(const char *recv_buffer, size_t message_len, 
 
     graph_updated = true;
 
-    // std::cout << "I am: " << self_id;
-    // std::cout << ", received from: " << from_id;
-    // std::cout << ", origin id: " << lsa.origin_id;
-    // std::cout << ", seq num: " << lsa.sequence_num;
-    // std::cout << std::endl;
-
-    Node *self_node = graph.get_node(self_id);
-    unordered_set<int> neighbors = self_node->neighbors; // Copy to avoid data race
-
-    struct timeval now;
-    gettimeofday(&now, 0);
-    std::cout << now.tv_sec << ", " << now.tv_usec;
-    std::cout << ", I am: " << self_id;
+    std::cout << "I am: " << self_id;
     std::cout << ", received from: " << from_id;
     std::cout << ", origin id: " << lsa.origin_id;
     std::cout << ", seq num: " << lsa.sequence_num;
-    std::cout << ", my neighbors: ";
-    for (const int id : self_node->neighbors)
-        std::cout << id << " ";
     std::cout << std::endl;
 
-    for (const int id : neighbors)
+    Node self_node = graph.get_node(self_id);
+
+    // struct timeval now;
+    // gettimeofday(&now, 0);
+    // std::cout << now.tv_sec << ", " << now.tv_usec;
+    // std::cout << ", I am: " << self_id;
+    // std::cout << ", received from: " << from_id;
+    // std::cout << ", origin id: " << lsa.origin_id;
+    // std::cout << ", seq num: " << lsa.sequence_num;
+    // std::cout << ", my neighbors: ";
+    // for (const int id : self_node->neighbors)
+    //     std::cout << id << " ";
+    // std::cout << std::endl;
+
+    for (const int id : self_node.neighbors)
     {
         // Forward LSA to our neighbors, but don't send the LSA back to the neighbor who sent it to us
         if (id != from_id && id != lsa.origin_id)
@@ -235,8 +233,6 @@ void LinkState::handle_lsa_command(const char *recv_buffer, size_t message_len, 
             socket.send(id, recv_buffer, message_len);
         }
     }
-
-    // route_finder.run_dijkstra();
 }
 
 void LinkState::handle_send_or_forward_command(const char *recv_buffer, bool is_from_manager)
@@ -281,7 +277,15 @@ void LinkState::handle_cost_command(const char *recv_buffer)
     uint16_t destination_id = extract_short(recv_buffer + 4);
     uint32_t new_weight = extract_long(recv_buffer + 6);
 
-    graph.set_edge_weight_pairs(self_id, destination_id, new_weight);
+    Node self_node = graph.get_node(self_id);
+    self_node.set_edge_weight(destination_id, new_weight);
+    graph.set_node(self_node);
+
+    Node destination_node = graph.get_node(destination_id);
+    destination_node.set_edge_weight(self_id, new_weight);
+    graph.set_node(destination_node);
+
+    send_lsa_to_neighbors();
 }
 
 struct timespec generate_timespec_from_ms(long int ms)

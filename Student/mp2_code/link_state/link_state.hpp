@@ -27,7 +27,7 @@ private:
     HeartbeatsTracker hb_tracker;
     Graph graph;
     RouteFinder route_finder;
-    void set_initial_costs(const char *filename);
+    Node create_self_node(const char *filename);
     void broadcast_heartbeats(long int heartbeat_interval_ms);
     void monitor_heartbeats(long int checkup_interval_ms, long int timeout_tolerance_ms);
     void send_lsa_to_neighbors();

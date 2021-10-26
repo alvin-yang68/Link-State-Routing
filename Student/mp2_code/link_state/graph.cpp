@@ -1,5 +1,3 @@
-#include <stdexcept>
-
 #include "graph.hpp"
 
 #define INFINITY 0x3f3f3f3f
@@ -7,13 +5,14 @@
 
 using namespace std;
 
-Node::Node(const Node &obj) : id{obj.id}, sequence_num{obj.sequence_num}, neighbors(obj.neighbors), edge_weights(obj.edge_weights)
-{
-}
-
 Node::Node(int id) : id{id}, sequence_num{0}, neighbors{}, edge_weights{}
 {
     init_node(NUM_OF_NODES);
+}
+
+int Node::get_id()
+{
+    return id;
 }
 
 void Node::init_node(int max_size)
@@ -50,12 +49,12 @@ bool Node::has_edge_weight(int target)
 
 void Node::set_edge_weight(int target, int new_weight)
 {
-    edge_weights[target] = new_weight;
+    edge_weights.insert(make_pair(target, new_weight));
 }
 
 LSA Node::generate_lsa()
 {
-    LSA lsa = LSA(id, sequence_num);
+    LSA lsa(id, sequence_num);
 
     for (const int &id : neighbors)
     {
@@ -65,68 +64,92 @@ LSA Node::generate_lsa()
     return lsa;
 }
 
-Graph::Graph() : nodes{}
+Graph::Graph() : nodes{}, graph_mutex{}
 {
     nodes.reserve(NUM_OF_NODES);
 }
 
-Node *Graph::get_node(int id)
+Graph::Graph(const Graph &other) : nodes(other.nodes), graph_mutex{}
 {
-    if (has_node(id))
-        return nodes.at(id);
-
-    return register_node(new Node(id));
 }
 
-bool Graph::has_node(int target)
+Graph::Graph(Graph &&other) : nodes(move(other.nodes)), graph_mutex{}
+{
+}
+
+Graph &Graph::operator=(Graph &other)
+{
+    nodes = move(other.get_nodes_map_copy()); // We move assigns the `nodes` copy returned by `get_nodes_map_copy` to avoid copying it again for the second time
+    return *this;
+}
+
+unordered_map<int, Node> Graph::get_nodes_map_copy()
+{
+    graph_mutex.lock();
+    unordered_map<int, Node> nodes_copy(nodes); // This creates a copy of `nodes` (i.e. "copy initialization")
+    graph_mutex.unlock();
+
+    return nodes_copy; // Hopefully copy elision is triggered. Otherwise, it should perform a move semantic
+}
+
+Node Graph::get_node(int id)
+{
+    graph_mutex.lock();
+    Node node_copy(get_node_(id)); // This will perform a copy (i.e. "copy initialization") because `get_node` returns a reference that is owned by `nodes`
+    graph_mutex.unlock();
+
+    return node_copy;
+}
+
+Node &Graph::get_node_(int id)
+{
+    if (!has_node(id))
+        nodes.insert(make_pair(id, Node(id)));
+
+    return nodes.at(id);
+}
+
+bool Graph::has_node(int target) const
 {
     return nodes.find(target) != nodes.end();
 }
 
-Node *Graph::register_node(Node *node)
+// This steals the data from `target` node and gives their ownerships to the graph
+void Graph::set_node(Node &target)
 {
-    nodes.insert(make_pair(node->id, node));
-    return node;
-}
-
-const unordered_map<int, Node *> &Graph::get_nodes() const
-{
-    return nodes;
-}
-
-void Graph::set_edge_weight_pairs(int source_id, int target_id, int new_weight)
-{
-    Node *source_node = get_node(source_id);
-    source_node->set_edge_weight(target_id, new_weight);
-
-    Node *target_node = get_node(target_id);
-    target_node->set_edge_weight(source_id, new_weight);
+    graph_mutex.lock();
+    nodes[target.get_id()] = move(target);
+    graph_mutex.unlock();
 }
 
 bool Graph::accept_lsa(LSA &lsa)
 {
+    graph_mutex.lock();
+
     int target_id = lsa.origin_id;
+    Node &target_node = get_node_(target_id);
 
-    Node *target_node = get_node(target_id);
-
-    if (lsa.sequence_num <= target_node->sequence_num)
+    if (lsa.sequence_num <= target_node.sequence_num)
+    {
+        graph_mutex.unlock();
         return false;
+    }
 
-    target_node->sequence_num = lsa.sequence_num;
-    target_node->neighbors.clear();
+    target_node.sequence_num = lsa.sequence_num;
+    target_node.neighbors.clear();
 
     for (const struct EdgeToNeighbor &new_edge : lsa.edges)
     {
-        target_node->neighbors.insert(new_edge.neighbor_id);
-        target_node->set_edge_weight(new_edge.neighbor_id, new_edge.weight);
+        target_node.insert_neighbor(new_edge.neighbor_id);
+        target_node.set_edge_weight(new_edge.neighbor_id, new_edge.weight);
     }
 
+    graph_mutex.unlock();
     return true;
 }
 
-RouteFinder::RouteFinder(int self_id) : self_id{self_id}, nodes_snapshot{}
+RouteFinder::RouteFinder(int self_id) : self_id{self_id}
 {
-    nodes_snapshot.reserve(NUM_OF_NODES);
 }
 
 void RouteFinder::register_graph(Graph *graph)
@@ -136,8 +159,7 @@ void RouteFinder::register_graph(Graph *graph)
 
 void RouteFinder::run_dijkstra()
 {
-    reset_states();
-    save_nodes_snapshot();
+    ready_states();
 
     frontier.push({.neighbor_id = self_id, .weight = distances[self_id]});
 
@@ -146,13 +168,13 @@ void RouteFinder::run_dijkstra()
         const int curr_id = frontier.top().neighbor_id;
         frontier.pop();
 
-        Node *curr_node = get_node_from_snapshot(curr_id);
+        Node curr_node = graph_snapshot.get_node(curr_id);
 
-        for (const int neighbor_id : curr_node->neighbors)
+        for (const int neighbor_id : curr_node.neighbors)
         {
             const bool is_unvisited = distances[neighbor_id] == INFINITY ? true : false;
 
-            const int potential_weight = distances[curr_id] + curr_node->get_edge_weight(neighbor_id);
+            const int potential_weight = distances[curr_id] + curr_node.get_edge_weight(neighbor_id);
 
             if (potential_weight < distances[neighbor_id])
             {
@@ -166,7 +188,7 @@ void RouteFinder::run_dijkstra()
     }
 }
 
-void RouteFinder::reset_states()
+void RouteFinder::ready_states()
 {
     distances = vector<int>(NUM_OF_NODES, INFINITY);
     distances[self_id] = 0;
@@ -176,26 +198,7 @@ void RouteFinder::reset_states()
 
     clear_queue(frontier);
 
-    nodes_snapshot.clear();
-}
-
-void RouteFinder::save_nodes_snapshot()
-{
-    for (const pair<int, Node *> &kv : graph->get_nodes())
-    {
-        nodes_snapshot.insert(make_pair(kv.first, new Node(*kv.second)));
-    }
-}
-
-Node *RouteFinder::get_node_from_snapshot(int id)
-{
-    if (nodes_snapshot.find(id) != nodes_snapshot.end())
-        return nodes_snapshot.at(id);
-
-    Node *new_node = new Node(id);
-    nodes_snapshot.insert(make_pair(id, new_node));
-
-    return new_node;
+    graph_snapshot = *graph; // Copy assigns the current graph. Internally, it performs a locked copy assignment from `graph.nodes` to `graph_snapshot.nodes`
 }
 
 int RouteFinder::find_next_hop(int destination_id)
