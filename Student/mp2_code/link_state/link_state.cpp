@@ -1,7 +1,5 @@
 #include "link_state.hpp"
 
-using namespace std;
-
 LinkState::LinkState(int self_id, const char *cost_file_name, const char *log_file_name) : self_id{self_id}, graph_updated{false}, socket{Socket(self_id)}, lsa_serializer{LsaSerializer()}, output_log{Log(log_file_name)}, hb_tracker{HeartbeatsTracker()}, graph{Graph()}, route_finder{RouteFinder(self_id)}
 {
     Node self_node = create_self_node(cost_file_name);
@@ -69,23 +67,11 @@ void LinkState::monitor_heartbeats(long int checkup_interval_ms, long int timeou
 
         Node self_node = graph.get_node(self_id); // This will return a deep copy of the `Node` from `graph`
 
-        // cout << "I am: " << self_node.id << ", my seq num: " << self_node.sequence_num;
-        // std::cout << ", my neighbors: ";
-        // for (auto it = self_node.neighbors.begin(); it != self_node.neighbors.end(); ++it)
-        //     std::cout << " " << *it;
-        // cout << endl;
-
         unordered_set<int> online_neighbors = hb_tracker.get_online_nodes(timeout_tolerance_ms);
         if (online_neighbors != self_node.neighbors)
         {
             self_node.neighbors = move(online_neighbors);
             self_node.sequence_num += 1;
-
-            // cout << "I am: " << self_node.get_id() << ", my seq num: " << self_node.sequence_num;
-            // std::cout << ", my neighbors: ";
-            // for (auto it = self_node.neighbors.begin(); it != self_node.neighbors.end(); ++it)
-            //     std::cout << " " << *it;
-            // std::cout << std::endl;
 
             graph.set_node(self_node); // Since `self_node` is a deep copy. Any changes to it must be copied back to the `graph` in order to update the "actual" node
 
@@ -175,63 +161,18 @@ void LinkState::handle_lsa_command(const char *recv_buffer, size_t message_len, 
     LSA lsa;
     lsa_serializer.deserialize(recv_buffer + 3, message_len - 3, &lsa);
 
-    // std::cout << "I am: " << self_id;
-    // std::cout << ", received from: " << from_id;
-    // std::cout << ", origin id: " << lsa.origin_id;
-    // std::cout << ", seq num: " << lsa.sequence_num;
-    // std::cout << ", for neighbors: ";
-    // for (const struct EdgeToNeighbor edge : lsa.edges)
-    //     std::cout << edge.neighbor_id << " " << edge.weight << ", ";
-    // std::cout << std::endl;
-
     if (!graph.accept_lsa(lsa)) // If stale LSA, then do nothing
         return;
 
     graph_updated = true;
 
-    std::cout << "I am: " << self_id;
-    std::cout << ", received from: " << from_id;
-    std::cout << ", origin id: " << lsa.origin_id;
-    std::cout << ", seq num: " << lsa.sequence_num;
-    std::cout << std::endl;
-
     Node self_node = graph.get_node(self_id);
-
-    // struct timeval now;
-    // gettimeofday(&now, 0);
-    // std::cout << now.tv_sec << ", " << now.tv_usec;
-    // std::cout << ", I am: " << self_id;
-    // std::cout << ", received from: " << from_id;
-    // std::cout << ", origin id: " << lsa.origin_id;
-    // std::cout << ", seq num: " << lsa.sequence_num;
-    // std::cout << ", my neighbors: ";
-    // for (const int id : self_node->neighbors)
-    //     std::cout << id << " ";
-    // std::cout << std::endl;
 
     for (const int id : self_node.neighbors)
     {
         // Forward LSA to our neighbors, but don't send the LSA back to the neighbor who sent it to us
         if (id != from_id && id != lsa.origin_id)
-        {
-            // struct timeval now;
-            // gettimeofday(&now, 0);
-            // std::cout << now.tv_sec << ", " << now.tv_usec;
-            // std::cout << ", I am: " << self_id;
-            // std::cout << ", forwarding to: " << id;
-            // std::cout << ", received from: " << from_id;
-            // std::cout << ", origin id: " << lsa.origin_id;
-            // std::cout << ", seq num: " << lsa.sequence_num;
-            // std::cout << ", my neighbors: ";
-            // for (const int id : self_node->neighbors)
-            // std::cout << id << " ";
-            // std::cout << ", for neighbors: ";
-            // for (const struct EdgeToNeighbor edge : lsa.edges)
-            //     std::cout << edge.neighbor_id << " " << edge.weight << ", ";
-            // std::cout << std::endl;
-
             socket.send(id, recv_buffer, message_len);
-        }
     }
 }
 
@@ -279,12 +220,14 @@ void LinkState::handle_cost_command(const char *recv_buffer)
 
     Node self_node = graph.get_node(self_id);
     self_node.set_edge_weight(destination_id, new_weight);
+    self_node.sequence_num += 1;
     graph.set_node(self_node);
 
     Node destination_node = graph.get_node(destination_id);
     destination_node.set_edge_weight(self_id, new_weight);
     graph.set_node(destination_node);
 
+    graph_updated = true;
     send_lsa_to_neighbors();
 }
 
