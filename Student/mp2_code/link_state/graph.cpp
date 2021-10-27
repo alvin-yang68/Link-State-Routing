@@ -29,11 +29,6 @@ void Node::init_node(int max_size)
     edge_weights.insert(make_pair(id, 0)); // Edge weight to itself is zero
 }
 
-void Node::insert_neighbor(int target)
-{
-    neighbors.insert(target);
-}
-
 int Node::get_edge_weight(int target)
 {
     if (has_edge_weight(target))
@@ -49,7 +44,7 @@ bool Node::has_edge_weight(int target)
 
 void Node::set_edge_weight(int target, int new_weight)
 {
-    edge_weights.insert(make_pair(target, new_weight));
+    edge_weights[target] = new_weight;
 }
 
 LSA Node::generate_lsa()
@@ -62,6 +57,18 @@ LSA Node::generate_lsa()
     }
 
     return lsa;
+}
+
+void Node::from_lsa(LSA &lsa)
+{
+    sequence_num = lsa.sequence_num;
+    neighbors.clear();
+
+    for (const struct EdgeToNeighbor &new_edge : lsa.edges)
+    {
+        neighbors.insert(new_edge.neighbor_id);
+        set_edge_weight(new_edge.neighbor_id, new_edge.weight);
+    }
 }
 
 Graph::Graph() : nodes{}, graph_mutex{}
@@ -104,7 +111,7 @@ Node Graph::get_node(int id)
 Node &Graph::get_node_(int id)
 {
     if (!has_node(id))
-        nodes.insert(make_pair(id, Node(id)));
+        nodes.emplace(id, Node(id));
 
     return nodes.at(id);
 }
@@ -127,25 +134,18 @@ bool Graph::accept_lsa(LSA &lsa)
     graph_mutex.lock();
 
     int target_id = lsa.origin_id;
-    Node &target_node = get_node_(target_id);
+    Node &target_node = get_node_(target_id); // This is NOT a copy
 
-    if (lsa.sequence_num <= target_node.sequence_num)
+    bool node_updated = false;
+
+    if (target_node.sequence_num < lsa.sequence_num)
     {
-        graph_mutex.unlock();
-        return false;
-    }
-
-    target_node.sequence_num = lsa.sequence_num;
-    target_node.neighbors.clear();
-
-    for (const struct EdgeToNeighbor &new_edge : lsa.edges)
-    {
-        target_node.insert_neighbor(new_edge.neighbor_id);
-        target_node.set_edge_weight(new_edge.neighbor_id, new_edge.weight);
+        target_node.from_lsa(lsa);
+        node_updated = true;
     }
 
     graph_mutex.unlock();
-    return true;
+    return node_updated;
 }
 
 RouteFinder::RouteFinder(int self_id) : self_id{self_id}

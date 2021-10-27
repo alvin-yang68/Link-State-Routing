@@ -19,12 +19,13 @@ class Node
 public:
     int sequence_num;
     unordered_set<int> neighbors;
+    Node() = default;
     Node(int id); // copy and move constructors, copy and move assignment operators, and destructor are implicit
     int get_id();
-    void insert_neighbor(int target);
     int get_edge_weight(int target);
     void set_edge_weight(int target, int new_weight);
     LSA generate_lsa();
+    void from_lsa(LSA &lsa);
 
 private:
     int id;
