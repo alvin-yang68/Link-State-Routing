@@ -1,7 +1,7 @@
 #include "graph.hpp"
 
 #define INFINITY 0x3f3f3f3f
-#define UNKNOWN -1
+#define UNREACHABLE -1
 
 using namespace std;
 
@@ -179,7 +179,11 @@ void RouteFinder::run_dijkstra()
             if (potential_weight < distances[neighbor_id])
             {
                 distances[neighbor_id] = potential_weight;
-                predecessors[neighbor_id] = curr_id;
+                predecessors[neighbor_id] = vector<int>{curr_id};
+            }
+            else if (potential_weight == distances[neighbor_id])
+            {
+                predecessors[neighbor_id].push_back(curr_id);
             }
 
             if (is_unvisited)
@@ -193,8 +197,8 @@ void RouteFinder::ready_states()
     distances = vector<int>(NUM_OF_NODES, INFINITY);
     distances[self_id] = 0;
 
-    predecessors = vector<int>(NUM_OF_NODES, UNKNOWN);
-    predecessors[self_id] = self_id;
+    predecessors = vector<vector<int>>(NUM_OF_NODES, vector<int>());
+    predecessors[self_id].push_back(self_id);
 
     clear_queue(frontier);
 
@@ -203,12 +207,20 @@ void RouteFinder::ready_states()
 
 int RouteFinder::find_next_hop(int destination_id)
 {
-    int curr_id = destination_id;
+    if (predecessors[destination_id].empty())
+        return UNREACHABLE;
 
-    while (predecessors[curr_id] != self_id && curr_id != -1)
+    int min_next_hop = INFINITY;
+    int potential_next_hop;
+
+    for (const int pred_id : predecessors[destination_id])
     {
-        curr_id = predecessors[curr_id];
+        if (pred_id == self_id)
+            return destination_id;
+
+        potential_next_hop = find_next_hop(pred_id);
+        min_next_hop = potential_next_hop < min_next_hop ? potential_next_hop : min_next_hop;
     }
 
-    return curr_id;
+    return min_next_hop;
 }

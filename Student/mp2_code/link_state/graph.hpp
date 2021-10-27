@@ -67,7 +67,7 @@ private:
     Graph *graph;
     Graph graph_snapshot;
     vector<int> distances;
-    vector<int> predecessors;
+    vector<vector<int>> predecessors;
     priority_queue<EdgeToNeighbor, vector<EdgeToNeighbor>, CompareWeight> frontier;
     void ready_states();
 };
