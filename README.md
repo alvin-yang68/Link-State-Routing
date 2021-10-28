@@ -8,6 +8,8 @@ Once each router obtains a global view of the entire network, it runs [Dijkstra'
 
 ## Running on the example topology
 
+![testtopo](https://user-images.githubusercontent.com/72721378/139183748-183f3c2e-c712-42ce-86f0-e80668caee83.png)
+
 1. `cd` to the `example/` directory
 2. Build the Dockerfile and run the image detached: `docker build -t <image_name> .` and `docker run -d --rm <image_name>`
 3. Run `docker exec -it <container name> /bin/bash` to attach an interactive bash shell on the running container.
