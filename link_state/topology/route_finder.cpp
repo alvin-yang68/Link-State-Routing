@@ -50,7 +50,7 @@ void RouteFinder::clear_states()
     clear_queue(frontier);
 }
 
-uint16_t RouteFinder::find_next_hop(uint16_t destination_id)
+int RouteFinder::find_next_hop(uint16_t destination_id)
 {
     if (predecessors[destination_id].empty())
         return UNREACHABLE;

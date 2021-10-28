@@ -12,7 +12,7 @@ class RouteFinder
 {
 public:
     RouteFinder(uint16_t self_id);
-    uint16_t find_next_hop(uint16_t destination_id);
+    int find_next_hop(uint16_t destination_id);
     void run_dijkstra(Graph &graph);
 
 private:
