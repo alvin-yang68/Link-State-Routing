@@ -165,7 +165,7 @@ void LinkState::handle_lsa_command(const char *recv_buffer, size_t message_len, 
     LSA lsa;
     lsa_serializer.deserialize(recv_buffer + 3, message_len - 3, &lsa);
 
-    if (!graph.accept_lsa(lsa)) // If stale LSA, then do nothing
+    if (!graph.accept_lsa(lsa)) // If stale LSA, then do nothing and return early
         return;
 
     graph_updated = true;
@@ -183,7 +183,7 @@ void LinkState::handle_lsa_command(const char *recv_buffer, size_t message_len, 
 void LinkState::handle_send_or_forward_command(const char *recv_buffer, bool is_from_manager)
 {
     // recv_buffer format: 'send'<4 ASCII bytes>, destID<net order 2 byte signed>, <some ASCII message>
-    uint16_t destination_id = extract_short(recv_buffer + 4);
+    uint16_t destination_id = decode_short_from_str(recv_buffer + 4);
     const char *message = recv_buffer + 6;
 
     if (destination_id == self_node->get_id())
@@ -196,7 +196,7 @@ void LinkState::handle_send_or_forward_command(const char *recv_buffer, bool is_
     int next_hop_id = route_finder.find_next_hop(destination_id);
     route_finder_mutex.unlock();
 
-    if (next_hop_id < 0)
+    if (next_hop_id == UNREACHABLE)
     {
         output_log.add_unreachable_entry(destination_id);
         return;
@@ -206,9 +206,8 @@ void LinkState::handle_send_or_forward_command(const char *recv_buffer, bool is_
     int length = 0;
 
     length += sprintf(forward_command, "frwd");
-    length += add_short(destination_id, forward_command + length);
-    strcpy(forward_command + length, message);
-    length += strlen(message);
+    length += encode_short_into_str(forward_command + length, destination_id);
+    length += sprintf(forward_command + length, message);
 
     socket.send(next_hop_id, forward_command, length);
 
@@ -221,8 +220,8 @@ void LinkState::handle_send_or_forward_command(const char *recv_buffer, bool is_
 void LinkState::handle_cost_command(const char *recv_buffer)
 {
     // recv_buffer format: 'cost'<4 ASCII bytes>, destID<net order 2 byte signed> newCost<net order 4 byte signed>
-    uint16_t destination_id = extract_short(recv_buffer + 4);
-    uint32_t new_weight = extract_long(recv_buffer + 6);
+    uint16_t destination_id = decode_short_from_str(recv_buffer + 4);
+    uint32_t new_weight = decode_long_from_str(recv_buffer + 6);
 
     graph_mutex.lock();
 

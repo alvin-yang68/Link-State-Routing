@@ -21,13 +21,13 @@ size_t LsaSerializer::serialize(const LSA &lsa, char *buffer, size_t buffer_len)
 {
     size_t idx = 0;
 
-    idx += add_short(lsa.origin_id, buffer + idx);
-    idx += add_long(lsa.sequence_num, buffer + idx);
+    idx += encode_short_into_str(buffer + idx, lsa.origin_id);
+    idx += encode_long_into_str(buffer + idx, lsa.sequence_num);
 
     for (const EdgeToNeighbor &edge : lsa.edges)
     {
-        idx += add_short(edge.neighbor_id, buffer + idx);
-        idx += add_long(edge.weight, buffer + idx);
+        idx += encode_short_into_str(buffer + idx, edge.neighbor_id);
+        idx += encode_long_into_str(buffer + idx, edge.weight);
     }
 
     buffer[idx] = '\0';
@@ -38,18 +38,18 @@ void LsaSerializer::deserialize(const char *buffer, size_t buffer_len, LSA *lsa)
 {
     size_t idx = 0;
 
-    lsa->origin_id = extract_short(buffer + idx);
+    lsa->origin_id = decode_short_from_str(buffer + idx);
     idx += sizeof(uint16_t);
 
-    lsa->sequence_num = extract_long(buffer + idx);
+    lsa->sequence_num = decode_long_from_str(buffer + idx);
     idx += sizeof(uint32_t);
 
     while (idx < buffer_len)
     {
-        uint16_t neighbor_id = extract_short(buffer + idx);
+        uint16_t neighbor_id = decode_short_from_str(buffer + idx);
         idx += sizeof(uint16_t);
 
-        uint32_t edge_weight = extract_long(buffer + idx);
+        uint32_t edge_weight = decode_long_from_str(buffer + idx);
         idx += sizeof(uint32_t);
 
         lsa->add_edge(neighbor_id, edge_weight);
